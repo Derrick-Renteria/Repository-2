@@ -18,7 +18,7 @@ export function Share({ c }: { c: Ctx }) {
     <div className="card" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 220px', gap: 18, alignItems: 'center' }}>
       <div className="form">
         <h2>Public link: coaches &amp; parents</h2>
-        <p className="muted">Anyone can open it on a phone, no login. It updates live, has a "find my athlete" search, and never shows notes or scratched athletes.</p>
+        <p className="muted">Anyone can open it on a phone, no login. It updates live, has a "find my athlete" search, shows times and results as they're entered, and never shows notes or scratched athletes.</p>
         <input type="text" readOnly value={url} onFocus={e => e.target.select()} />
         <div className="row">
           <button className="btn primary" onClick={() => { void navigator.clipboard?.writeText(url); toast('Link copied'); }}>Copy link</button>
@@ -35,6 +35,7 @@ export function Share({ c }: { c: Ctx }) {
         <a className="btn" href={'#/print/' + c.event.id + '?mode=flight'} target="_blank" rel="noreferrer">🖨 Schedule by flight</a>
         <a className="btn" href={'#/print/' + c.event.id + '?mode=name'} target="_blank" rel="noreferrer">🖨 Athlete A–Z (check-in list)</a>
         <a className="btn" href={'#/tv/' + c.event.id} target="_blank" rel="noreferrer">📺 TV "Now / Next" screen</a>
+        <a className="btn" href={'#/tv/' + c.event.id + '?mode=results'} target="_blank" rel="noreferrer">🏆 TV leaderboards</a>
       </div>
       <span className="small muted">Print pages open in a new tab: use Share ▸ Print on iPad, or Ctrl/Cmd+P on a computer (choose "Save as PDF" for a PDF).</span>
     </div>

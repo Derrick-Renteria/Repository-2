@@ -16,7 +16,14 @@ export const DEFAULT_SETTINGS: EventSettings = {
 };
 
 export interface EventRow { id: string; name: string; date: string | null; settings: EventSettings; createdAt: string }
-export interface Level { id: string; eventId: string; name: string; color: string; sort: number }
+export interface Level {
+  id: string; eventId: string; name: string; color: string; sort: number;
+  advanceCount: number;     // top N advance to the next round (0 = everyone is done after one run)
+  resultsFinal: boolean;    // director confirmed the level's results
+}
+export type ResultStatus = 'Finished' | 'DNF' | 'DNS' | 'DQ';
+export const RESULT_STATUSES: ResultStatus[] = ['Finished', 'DNF', 'DNS', 'DQ'];
+export type Outcome = 'advance' | 'done';
 export interface Flight {
   id: string; eventId: string; levelId: string; number: number;
   startMin: number | null; notes: string; changedAt: string | null;
@@ -25,6 +32,7 @@ export interface Athlete {
   id: string; eventId: string; name: string; age: number | null;
   levelId: string | null; flightId: string | null; overrideMin: number | null;
   status: Status; notes: string; changedAt: string | null; srcRow: number | null;
+  resultMs: number | null; resultStatus: ResultStatus | null; resultAt: string | null; outcome: Outcome | null;
 }
 export type TableName = 'events' | 'levels' | 'flights' | 'athletes' | 'changes';
 export interface UndoOp { table: TableName; id: string; op: 'update' | 'insert' | 'delete'; row?: Record<string, unknown>; patch?: Record<string, unknown> }

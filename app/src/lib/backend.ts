@@ -9,6 +9,7 @@ export interface Backend {
   loadAll(): Promise<Data>;
   write(ops: WriteOp[]): Promise<void>;
   subscribe(h: RemoteHandler, reload: () => void): () => void;
+  ping?(eventId: string): void;
 }
 const TABLES: TableName[] = ['events', 'levels', 'flights', 'athletes', 'changes'];
 
@@ -93,6 +94,13 @@ export class CloudBackend implements Backend {
       }
     }
   }
+  private pings = new Map<string, ReturnType<SupabaseClient['channel']>>();
+  /** Tell open public pages / TVs for this event to refresh right now (Realtime broadcast). */
+  ping(eventId: string) {
+    let ch = this.pings.get(eventId);
+    if (!ch) { ch = this.sb.channel('pub-ping-' + eventId); ch.subscribe(); this.pings.set(eventId, ch); }
+    void ch.send({ type: 'broadcast', event: 'changed', payload: { at: Date.now() } });
+  }
   subscribe(h: RemoteHandler, reload: () => void) {
     const ch = this.sb.channel('ninja-db');
     for (const t of TABLES) {
@@ -121,7 +129,8 @@ export async function loadPublic(sb: SupabaseClient, eventId: string): Promise<D
   return {
     events: m(ev.data) as unknown as Data['events'], levels: m(lv.data) as unknown as Data['levels'],
     flights: m(fl.data) as unknown as Data['flights'],
-    athletes: m(at.data).map(a => ({ status: 'Confirmed', notes: '', overrideMin: null, changedAt: null, srcRow: null, ...a })) as unknown as Data['athletes'],
+    athletes: m(at.data).map(a => ({ status: 'Confirmed', notes: '', overrideMin: null, changedAt: null, srcRow: null,
+      resultMs: null, resultStatus: null, resultAt: null, outcome: null, ...a })) as unknown as Data['athletes'],
     changes: [],
   };
 }

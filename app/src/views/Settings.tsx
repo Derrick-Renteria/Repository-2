@@ -5,6 +5,7 @@ import { supabase } from '../lib/backend';
 import { toast } from '../components/ui';
 import { athleteTime, flightLabel, levelName, scheduleSort } from '../lib/derive';
 import { fmt } from '../lib/time';
+import { fmtResult } from '../lib/results';
 import { go } from '../lib/router';
 
 export function Settings({ c }: { c: Ctx }) {
@@ -100,9 +101,9 @@ function download(name: string, body: string, type: string) {
 }
 function downloadCsv(c: Ctx) {
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['Start Time', 'Flight', 'Level', 'Athlete', 'Age', 'Status', 'Time Override', 'Notes']];
+  const rows = [['Start Time', 'Flight', 'Level', 'Athlete', 'Age', 'Status', 'Time Override', 'Result', 'Notes']];
   for (const a of scheduleSort(c, c.athletes)) {
-    rows.push([fmt(athleteTime(c, a)), flightLabel(c, a.flightId ? c.flightById.get(a.flightId) : null), levelName(c, a.levelId), a.name, String(a.age ?? ''), a.status, a.overrideMin !== null ? fmt(a.overrideMin) : '', a.notes]);
+    rows.push([fmt(athleteTime(c, a)), flightLabel(c, a.flightId ? c.flightById.get(a.flightId) : null), levelName(c, a.levelId), a.name, String(a.age ?? ''), a.status, a.overrideMin !== null ? fmt(a.overrideMin) : '', a.resultStatus === 'Finished' ? fmtResult(a.resultMs) : (a.resultStatus ?? ''), a.notes]);
   }
   download(`${c.event.name} schedule.csv`, rows.map(r => r.map(esc).join(',')).join('\n'), 'text/csv');
 }

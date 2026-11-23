@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react';
-import type { Athlete, Change, Data, EventRow, EventSettings, Flight, Level, TableName, UndoOp } from './types';
+import type { Athlete, Change, Data, EventRow, EventSettings, Flight, Level, Outcome, ResultStatus, TableName, UndoOp } from './types';
 import { DEFAULT_SETTINGS, EMPTY, LEVEL_COLORS } from './types';
 import { CloudBackend, LocalBackend, supabase, type Backend, type WriteOp } from './backend';
 import type { ImportResult } from './importer';
 import { fmt } from './time';
+import { fmtResult } from './results';
 
 type Row = { id: string } & Record<string, unknown>;
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
@@ -39,17 +40,24 @@ export async function reload() {
   if (reloading) return; reloading = true;
   try {
     const data = await backend.loadAll();
-    data.events.forEach(e => { e.settings = { ...DEFAULT_SETTINGS, ...(e.settings ?? {}) }; });
+    normalize(data);
     let active = state.activeEventId;
     if (!active || !data.events.some(e => e.id === active)) active = [...data.events].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]?.id ?? null;
     set({ data, ready: true, error: null, activeEventId: active });
   } catch (e) { set({ ready: true, error: (e as Error).message }); }
   finally { reloading = false; }
 }
+export function normalize(data: Data) {
+  data.events.forEach(e => { e.settings = { ...DEFAULT_SETTINGS, ...(e.settings ?? {}) }; });
+  data.levels.forEach(l => { l.advanceCount ??= 0; l.resultsFinal ??= false; });
+  data.athletes.forEach(a => { a.resultMs ??= null; a.resultStatus ??= null; a.resultAt ??= null; a.outcome ??= null; });
+  return data;
+}
 function applyRemote(table: TableName, row: Record<string, unknown> | null, id: string) {
   const list = (state.data[table] as unknown as Row[]).filter(r => r.id !== id);
   if (row) {
     if (table === 'events') row.settings = { ...DEFAULT_SETTINGS, ...((row.settings as object) ?? {}) };
+    if (table === 'levels') { row.advanceCount ??= 0; row.resultsFinal ??= false; }
     const old = (state.data[table] as unknown as Row[]).find(r => r.id === id);
     list.push({ ...(old ?? {}), ...row } as Row);
   }
@@ -70,7 +78,7 @@ async function commit(ops: WriteOp[]) {
     d[op.table] = rows;
   }
   set({ data: d as unknown as Data, saving: state.saving + 1 });
-  try { await backend.write(ops); set({ saving: state.saving - 1, error: null }); }
+  try { await backend.write(ops); set({ saving: state.saving - 1, error: null }); if (state.activeEventId) backend.ping?.(state.activeEventId); }
   catch (e) { set({ saving: state.saving - 1, error: 'Not saved: ' + (e as Error).message }); await reload(); }
 }
 
@@ -112,7 +120,7 @@ export const moveAthlete = (id: string, flight: Flight | null) =>
 
 export async function addAthlete(eventId: string, a: Partial<Athlete>) {
   const row: Athlete = { id: uid(), eventId, name: 'New athlete', age: null, levelId: null, flightId: null, overrideMin: null,
-    status: 'Pending', notes: '', changedAt: nowISO(), srcRow: null, ...a };
+    status: 'Pending', notes: '', changedAt: nowISO(), srcRow: null, resultMs: null, resultStatus: null, resultAt: null, outcome: null, ...a } as Athlete;
   await commit([{ table: 'athletes', upsert: [row as unknown as Row] },
     { table: 'changes', upsert: [logChange(eventId, row.name, 'Added', '', flLabel(row.flightId), [{ table: 'athletes', id: row.id, op: 'delete' }]) as unknown as Row] }]);
   return row;
@@ -169,7 +177,7 @@ export async function shiftFlights(eventId: string, fromMin: number, delta: numb
 // ---------------- levels / events ----------------
 export async function saveLevel(l: Partial<Level> & { eventId: string }) {
   const lvls = state.data.levels.filter(x => x.eventId === l.eventId);
-  const row = l.id ? { ...l } : { id: uid(), name: 'New level', color: LEVEL_COLORS[lvls.length % LEVEL_COLORS.length], sort: lvls.length + 1, ...l };
+  const row = l.id ? { ...l } : { id: uid(), name: 'New level', color: LEVEL_COLORS[lvls.length % LEVEL_COLORS.length], sort: lvls.length + 1, advanceCount: 0, resultsFinal: false, ...l };
   await commit([{ table: 'levels', upsert: [row as Row] }]);
 }
 export async function deleteLevel(id: string) {
@@ -184,14 +192,15 @@ export async function updateEvent(id: string, patch: Partial<Omit<EventRow, 'set
 }
 export async function createEvent(name: string, date: string | null, imp?: ImportResult) {
   const ev: EventRow = { id: uid(), name, date, settings: { ...DEFAULT_SETTINGS }, createdAt: nowISO() };
-  const levels: Level[] = (imp?.levels ?? []).map((n, i) => ({ id: uid(), eventId: ev.id, name: n, color: LEVEL_COLORS[i % LEVEL_COLORS.length], sort: i + 1 }));
+  const levels: Level[] = (imp?.levels ?? []).map((n, i) => ({ id: uid(), eventId: ev.id, name: n, color: LEVEL_COLORS[i % LEVEL_COLORS.length], sort: i + 1, advanceCount: 0, resultsFinal: false }));
   const lid = new Map(levels.map(l => [l.name, l.id]));
   const flights: Flight[] = (imp?.flights ?? []).map(f => ({ id: uid(), eventId: ev.id, levelId: lid.get(f.level)!, number: f.number, startMin: f.startMin, notes: f.notes, changedAt: null }));
   const fk = new Map(flights.map(f => [`${f.levelId}|${f.number}`, f.id]));
   const athletes: Athlete[] = (imp?.athletes ?? []).map(a => {
     const levelId = a.level ? lid.get(a.level) ?? null : null;
     return { id: uid(), eventId: ev.id, name: a.name, age: a.age, levelId, flightId: levelId && a.flight !== null ? fk.get(`${levelId}|${a.flight}`) ?? null : null,
-      overrideMin: a.overrideMin, status: a.status, notes: a.notes, changedAt: null, srcRow: a.srcRow };
+      overrideMin: a.overrideMin, status: a.status, notes: a.notes, changedAt: null, srcRow: a.srcRow,
+      resultMs: null, resultStatus: null, resultAt: null, outcome: null };
   });
   await commit([
     { table: 'events', upsert: [ev as unknown as Row] },
@@ -222,4 +231,30 @@ export async function undoChange(id: string) {
         : { table: u.table, remove: [u.id] });
   ops.push({ table: 'changes', upsert: [{ id, undone: true }, logChange(c.eventId, c.target, 'Undo', `${c.field}: ${c.newValue}`, c.oldValue, null) as unknown as Row] });
   await commit(ops);
+}
+
+// ---------------- results ----------------
+const resultLabel = (st: ResultStatus | null, ms: number | null) => (!st ? '—' : st === 'Finished' ? fmtResult(ms) : st);
+/** Record (or clear) an athlete's run. Pass status null to clear. */
+export async function setResult(id: string, status: ResultStatus | null, ms: number | null) {
+  const a = find<Athlete>('athletes', id); if (!a) return;
+  const patch = { resultStatus: status, resultMs: status === 'Finished' ? ms : null, resultAt: status ? nowISO() : null };
+  if (patch.resultStatus === a.resultStatus && patch.resultMs === a.resultMs) return;
+  const before = { resultStatus: a.resultStatus, resultMs: a.resultMs, resultAt: a.resultAt };
+  await commit([{ table: 'athletes', upsert: [{ id, ...patch }] },
+    { table: 'changes', upsert: [logChange(a.eventId, a.name, 'Result', resultLabel(a.resultStatus, a.resultMs), resultLabel(patch.resultStatus, patch.resultMs),
+      [{ table: 'athletes', id, op: 'update', patch: before }]) as unknown as Row] }]);
+}
+export async function setOutcome(id: string, outcome: Outcome | null) {
+  const a = find<Athlete>('athletes', id); if (!a || a.outcome === outcome) return;
+  const lab = (o: Outcome | null) => (o === 'advance' ? 'Advancing' : o === 'done' ? 'Done' : 'Automatic');
+  await commit([{ table: 'athletes', upsert: [{ id, outcome }] },
+    { table: 'changes', upsert: [logChange(a.eventId, a.name, 'Outcome', lab(a.outcome), lab(outcome), [{ table: 'athletes', id, op: 'update', patch: { outcome: a.outcome } }]) as unknown as Row] }]);
+}
+export async function updateLevel(id: string, patch: Partial<Level>) {
+  const l = find<Level>('levels', id); if (!l) return;
+  const keys = Object.keys(patch) as (keyof Level)[];
+  const ch = keys.filter(k => patch[k] !== l[k]).map(k => logChange(l.eventId, l.name, k === 'resultsFinal' ? 'Results final' : k === 'advanceCount' ? 'Top N advance' : k,
+    String(l[k]), String(patch[k]), [{ table: 'levels', id, op: 'update', patch: { [k]: l[k] } }]));
+  await commit([{ table: 'levels', upsert: [{ id, ...patch }] }, { table: 'changes', upsert: ch as unknown as Row[] }]);
 }

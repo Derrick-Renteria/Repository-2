@@ -10,6 +10,7 @@ import { Athletes } from './views/Athletes';
 import { Flights } from './views/Flights';
 import { FlightView } from './views/FlightView';
 import { Changes } from './views/Changes';
+import { Results } from './views/Results';
 import { Import } from './views/Import';
 import { Settings } from './views/Settings';
 import { Share, Poster } from './views/Share';
@@ -18,7 +19,7 @@ import { Login } from './views/Login';
 import { usePublicCtx } from './lib/publicData';
 
 const NAV: [string, string][] = [['', 'Dashboard'], ['schedule', 'Schedule'], ['athletes', 'Athletes'], ['flights', 'Flights'],
-  ['flight', 'Flight view'], ['changes', 'Changes'], ['share', 'Share'], ['settings', 'Settings']];
+  ['flight', 'Flight view'], ['results', 'Results'], ['changes', 'Changes'], ['share', 'Share'], ['settings', 'Settings']];
 const PUBLIC = ['public', 'print', 'tv', 'poster'];
 
 export default function App() {
@@ -84,6 +85,7 @@ function Admin({ route, email }: { route: string[]; email: string | null }) {
               : page === 'athletes' ? <Athletes c={c} />
                 : page === 'flights' ? <Flights c={c} />
                   : page === 'flight' ? <FlightView c={c} id={route[1]} />
+                    : page === 'results' ? <Results c={c} />
                     : page === 'changes' ? <Changes c={c} />
                       : page === 'share' ? <Share c={c} />
                         : page === 'settings' ? <Settings c={c} />

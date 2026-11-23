@@ -67,6 +67,7 @@ export function Dashboard({ c }: { c: Ctx }) {
       <Tile k="Last flight" v={used.length ? fmt(used[used.length - 1].startMin) : '—'} s={used.length ? flightLabel(c, used[used.length - 1]) : ''} small />
       <Tile k="Needs attention" v={problems.length + flightProblems.length} s={`${c.athletes.filter(a => a.status === 'Pending').length} pending review`} bad={problems.length + flightProblems.length > 0} />
       <Tile k="Changed recently" v={recent.length} s={`last ${c.event.settings.changeWindowMin} min`} />
+      <Tile k="Results in" v={active.filter(a => a.resultStatus).length} s={`of ${active.length} · enter on Results tab`} />
     </div>
 
     <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))' }}>
