@@ -69,6 +69,14 @@ create index if not exists flights_event on public.flights(event_id);
 create index if not exists changes_event on public.changes(event_id);
 
 -- ---------- security: anyone can READ the schedule, only editors can CHANGE it ----------
+-- Table permissions (newer Supabase projects don't grant these automatically).
+-- Row-level security below still decides exactly which rows each person can see or change.
+grant usage on schema public to anon, authenticated;
+grant select on public.events, public.levels, public.flights to anon;
+grant select, insert, update, delete on public.events, public.levels, public.flights,
+  public.athletes, public.changes, public.editors to authenticated;
+grant execute on function public.is_editor() to anon, authenticated;
+
 alter table public.editors  enable row level security;
 alter table public.events   enable row level security;
 alter table public.levels   enable row level security;
