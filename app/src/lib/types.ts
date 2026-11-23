@@ -9,10 +9,11 @@ export interface EventSettings {
   published: boolean;
   currentFlightId: string | null;
   currentStartedAt: string | null;
+  hideResultsUntilFinal: boolean;
 }
 export const DEFAULT_SETTINGS: EventSettings = {
   maxPerFlight: 10, changeWindowMin: 60, flightLengthMin: 15,
-  publicShowAge: false, published: true, currentFlightId: null, currentStartedAt: null,
+  publicShowAge: false, published: true, currentFlightId: null, currentStartedAt: null, hideResultsUntilFinal: false,
 };
 
 export interface EventRow { id: string; name: string; date: string | null; settings: EventSettings; createdAt: string }
@@ -32,7 +33,7 @@ export interface Athlete {
   id: string; eventId: string; name: string; age: number | null;
   levelId: string | null; flightId: string | null; overrideMin: number | null;
   status: Status; notes: string; changedAt: string | null; srcRow: number | null;
-  resultMs: number | null; resultStatus: ResultStatus | null; resultAt: string | null; outcome: Outcome | null;
+  resultMs: number | null; resultPoints: number | null; resultStatus: ResultStatus | null; resultAt: string | null; outcome: Outcome | null;
 }
 export type TableName = 'events' | 'levels' | 'flights' | 'athletes' | 'changes';
 export interface UndoOp { table: TableName; id: string; op: 'update' | 'insert' | 'delete'; row?: Record<string, unknown>; patch?: Record<string, unknown> }

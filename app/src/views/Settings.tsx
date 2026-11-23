@@ -25,6 +25,8 @@ export function Settings({ c }: { c: Ctx }) {
       </div>
       <label className="row"><input type="checkbox" checked={s.published} onChange={e => setS({ published: e.target.checked })} /> <b>Public schedule is visible</b> <span className="muted small">(turn off to hide it while you're still arranging)</span></label>
       <label className="row"><input type="checkbox" checked={s.publicShowAge} onChange={e => setS({ publicShowAge: e.target.checked })} /> Show ages on the public schedule</label>
+      <label className="row"><input type="checkbox" checked={s.hideResultsUntilFinal} onChange={e => setS({ hideResultsUntilFinal: e.target.checked })} />
+        Hide scores from parents until a level's results are final <span className="muted small">(otherwise scores show live as they're entered)</span></label>
     </div>
 
     <div className="card form">
@@ -101,9 +103,9 @@ function download(name: string, body: string, type: string) {
 }
 function downloadCsv(c: Ctx) {
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['Start Time', 'Flight', 'Level', 'Athlete', 'Age', 'Status', 'Time Override', 'Result', 'Notes']];
+  const rows = [['Start Time', 'Flight', 'Level', 'Athlete', 'Age', 'Status', 'Time Override', 'Points', 'Run Time', 'Result', 'Notes']];
   for (const a of scheduleSort(c, c.athletes)) {
-    rows.push([fmt(athleteTime(c, a)), flightLabel(c, a.flightId ? c.flightById.get(a.flightId) : null), levelName(c, a.levelId), a.name, String(a.age ?? ''), a.status, a.overrideMin !== null ? fmt(a.overrideMin) : '', a.resultStatus === 'Finished' ? fmtResult(a.resultMs) : (a.resultStatus ?? ''), a.notes]);
+    rows.push([fmt(athleteTime(c, a)), flightLabel(c, a.flightId ? c.flightById.get(a.flightId) : null), levelName(c, a.levelId), a.name, String(a.age ?? ''), a.status, a.overrideMin !== null ? fmt(a.overrideMin) : '', a.resultPoints === null ? '' : String(a.resultPoints), a.resultStatus === 'Finished' ? fmtResult(a.resultMs) : '', a.resultStatus ?? '', a.notes]);
   }
   download(`${c.event.name} schedule.csv`, rows.map(r => r.map(esc).join(',')).join('\n'), 'text/csv');
 }

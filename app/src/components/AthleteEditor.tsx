@@ -4,7 +4,7 @@ import type { Ctx } from '../lib/derive';
 import { athleteAlerts, athleteTime, duplicateNames, flightLabel, sortedFlights } from '../lib/derive';
 import { STATUSES, type Athlete } from '../lib/types';
 import { updateAthlete, deleteAthlete, undoChange, getState, setResult, setOutcome } from '../lib/store';
-import { fmtResult, parseResult, verdict } from '../lib/results';
+import { fmtResult, parsePoints, parseResult, verdict } from '../lib/results';
 import type { Outcome, ResultStatus } from '../lib/types';
 import { ago, fmt } from '../lib/time';
 
@@ -14,10 +14,19 @@ export function AthleteEditor({ c, athlete, onClose }: { c: Ctx; athlete: Athlet
   const [age, setAge] = useState(a.age === null ? '' : String(a.age));
   const [notes, setNotes] = useState(a.notes);
   const [rt, setRt] = useState(a.resultStatus === 'Finished' ? fmtResult(a.resultMs) : '');
+  const [rp, setRp] = useState(a.resultPoints !== null && a.resultPoints !== undefined ? String(+a.resultPoints) : '');
   const flights = useMemo(() => sortedFlights(c).filter(f => !a.levelId || f.levelId === a.levelId), [c, a.levelId]);
   const alerts = athleteAlerts(c, a, duplicateNames(c));
   const history = getState().data.changes.filter(ch => ch.eventId === a.eventId && ch.target === a.name).sort((x, y) => y.at.localeCompare(x.at)).slice(0, 8);
   const save = (p: Partial<Athlete>) => { void updateAthlete(a.id, p); };
+  const saveRes = () => {
+    const p = parsePoints(rp), ms = rt.trim() ? parseResult(rt) : null;
+    if (Number.isNaN(p as number)) { toast('Points must be a number'); return; }
+    if (rt.trim() && ms === null) { toast('Use a time like 42.31 or 1:05.40'); return; }
+    if (p === null && ms === null) return;
+    if (ms !== null) setRt(fmtResult(ms));
+    void setResult(a.id, ms === null && a.resultStatus === 'DNF' ? 'DNF' : 'Finished', ms, p);
+  };
 
   return (
     <Modal title={a.name} onClose={onClose} actions={<StatusPill s={a.status} />}>
@@ -56,10 +65,11 @@ export function AthleteEditor({ c, athlete, onClose }: { c: Ctx; athlete: Athlet
           <div className="seg">{STATUSES.map(s => <button key={s} className={a.status === s ? 'on' : ''} onClick={() => save({ status: s })}>{s}</button>)}</div></label>
         <label className="f">Competition result
           <div className="row" style={{ flexWrap: 'nowrap' }}>
-            <input type="text" inputMode="decimal" placeholder="42.31" value={rt} style={{ maxWidth: 130, fontSize: 20, fontWeight: 800 }} onChange={e => setRt(e.target.value)}
-              onBlur={() => { if (!rt.trim()) return; const ms = parseResult(rt); if (ms === null) { toast('Use a time like 42.31 or 1:05.40'); return; } setRt(fmtResult(ms)); void setResult(a.id, 'Finished', ms); }} />
-            <div className="seg mini">{(['DNF', 'DNS', 'DQ'] as ResultStatus[]).map(s => <button key={s} className={a.resultStatus === s ? 'on' : ''} onClick={() => { setRt(''); void setResult(a.id, s, null); }}>{s}</button>)}</div>
-            {a.resultStatus && <button className="btn sm" onClick={() => { setRt(''); void setResult(a.id, null, null); }}>Clear</button>}
+            <input type="text" inputMode="decimal" placeholder="pts" value={rp} style={{ maxWidth: 80, fontSize: 20, fontWeight: 800 }} onChange={e => setRp(e.target.value)} onBlur={() => saveRes()} />
+            <input type="text" inputMode="decimal" placeholder="time" value={rt} style={{ maxWidth: 120, fontSize: 20, fontWeight: 800 }} onChange={e => setRt(e.target.value)} onBlur={() => saveRes()} />
+            <div className="seg mini">{(['DNF', 'DNS', 'DQ'] as ResultStatus[]).map(s => <button key={s} className={a.resultStatus === s ? 'on' : ''}
+              onClick={() => { const p = parsePoints(rp); setRt(''); if (s !== 'DNF') setRp(''); void setResult(a.id, s, null, s === 'DNF' && !Number.isNaN(p as number) ? p : null); }}>{s === 'DNF' ? 'Fell' : s}</button>)}</div>
+            {a.resultStatus && <button className="btn sm" onClick={() => { setRt(''); setRp(''); void setResult(a.id, null, null); }}>Clear</button>}
           </div>
           <div className="row" style={{ marginTop: 6 }}><span className="small">{verdict(c, a).label}</span><span className="spacer" />
             <select value={a.outcome ?? ''} style={{ width: 'auto', minHeight: 34, padding: '4px 8px' }} onChange={e => void setOutcome(a.id, (e.target.value || null) as Outcome | null)}>

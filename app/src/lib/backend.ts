@@ -130,7 +130,7 @@ export async function loadPublic(sb: SupabaseClient, eventId: string): Promise<D
     events: m(ev.data) as unknown as Data['events'], levels: m(lv.data) as unknown as Data['levels'],
     flights: m(fl.data) as unknown as Data['flights'],
     athletes: m(at.data).map(a => ({ status: 'Confirmed', notes: '', overrideMin: null, changedAt: null, srcRow: null,
-      resultMs: null, resultStatus: null, resultAt: null, outcome: null, ...a })) as unknown as Data['athletes'],
+      resultMs: null, resultPoints: null, resultStatus: null, resultAt: null, outcome: null, ...a })) as unknown as Data['athletes'],
     changes: [],
   };
 }

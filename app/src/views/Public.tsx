@@ -5,7 +5,7 @@ import { fmt } from '../lib/time';
 import { usePublicCtx } from '../lib/publicData';
 import { useTick } from '../components/ui';
 import { query } from '../lib/router';
-import { latestResults, resultText, standings, verdict, ordinal } from '../lib/results';
+import { fmtPoints, fmtResult, latestResults, resultText, standings, verdict, ordinal } from '../lib/results';
 import { Leaderboard } from './Results';
 
 export function PublicPage({ eventId }: { eventId?: string }) {
@@ -70,7 +70,7 @@ function PublicBody({ c, updated }: { c: Ctx; updated: Date | null }) {
             <div className="row"><b style={{ fontSize: 18 }}>{a.name}</b><span className="spacer" />
               <span className="time" style={{ fontSize: 22 }}>{fmt(athleteTime(c, a))}</span><span className="muted">{flightLabel(c, f, true)}</span></div>
             {a.resultStatus ? <div className={'resultcard v-' + vd.kind}><div className="row"><span>Result</span><span className="spacer" /><span className="big time">{resultText(a)}</span></div>
-              <div>{vd.label}</div></div> : <div className="small muted" style={{ marginTop: 4 }}>No result yet. Times appear here right after the run.</div>}
+              <div>{vd.label}</div></div> : <div className="small muted" style={{ marginTop: 4 }}>No score yet. Points and time appear here right after the run.</div>}
           </div>;
         })}
       </div>}
@@ -132,7 +132,9 @@ export function TvPage({ eventId }: { eventId?: string }) {
     const lv = c.levelById.get(flash.levelId ?? '');
     return <div className="tvflash" key={flash.id + flash.resultAt}><div className="card2">
       <div className="lab" style={{ color: 'var(--accent)', fontWeight: 800, letterSpacing: '.3vw', fontSize: '1.6vw' }}>NEW RESULT</div>
-      <div className="nm">{flash.name}</div><div className="tm">{resultText(flash)}</div>
+      <div className="nm">{flash.name}</div>
+      {flash.resultPoints !== null && <div className="pts">{fmtPoints(flash.resultPoints)}</div>}
+      <div className="tm">{flash.resultStatus === 'Finished' ? fmtResult(flash.resultMs) : flash.resultStatus === 'DNF' ? 'Fell' : flash.resultStatus}</div>
       <div className="rk" style={{ color: lv?.color }}>{st?.rank ? `${ordinal(st.rank)} in ${lv?.name}` : lv?.name}</div></div></div>; })();
 
   if (query('mode') === 'results') {
@@ -158,7 +160,8 @@ export function TvPage({ eventId }: { eventId?: string }) {
   const box = (f: typeof main, label: string, small = false) => f && <div className={'box' + (small ? ' small' : '')} key={f.id + label}>
     <div className="lab">{label}</div><div className="tm">{fmt(f.startMin)}</div>
     <div className="fl" style={{ color: levelColor(c, f.levelId) }}>{flightLabel(c, f, true)}</div>
-    <ul>{activeIn(c, f).sort((a, b) => a.name.localeCompare(b.name)).map(a => <li key={a.id}>{a.name}{a.resultStatus && <span style={{ float: 'right', marginRight: '2vw', color: '#FDE68A', fontWeight: 800 }}>{resultText(a)}</span>}</li>)}</ul></div>;
+    <ul style={activeIn(c, f).some(a => a.resultStatus) ? { columns: 1 } : undefined}>{activeIn(c, f).sort((a, b) => a.name.localeCompare(b.name)).map(a =>
+      <li key={a.id} style={{ display: 'flex', gap: '1vw' }}><span>{a.name}</span>{a.resultStatus && <span style={{ marginLeft: 'auto', marginRight: '1vw', color: '#FDE68A', fontWeight: 800 }}>{resultText(a)}</span>}</li>)}</ul></div>;
   return <div className="tv">{header}
     <div className="cols">
       {box(main, nn.current ? 'NOW ON THE COURSE' : 'FIRST UP') ?? <div className="box"><div className="fl">No flights scheduled</div></div>}

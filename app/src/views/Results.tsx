@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Ctx } from '../lib/derive';
 import { activeIn, flightLabel, levelColor, nowNext, sortedFlights } from '../lib/derive';
 import { fmt } from '../lib/time';
-import { fmtResult, parseResult, resultText, standings, verdict, ordinal, type Standing } from '../lib/results';
+import { fmtPoints, fmtResult, parsePoints, parseResult, resultText, standings, verdict, ordinal, type Standing } from '../lib/results';
 import { setOutcome, setResult, updateLevel } from '../lib/store';
 import type { Athlete, Outcome, ResultStatus } from '../lib/types';
 import { LevelPill, toast } from '../components/ui';
@@ -34,7 +34,8 @@ export function Results({ c }: { c: Ctx }) {
         <button className="btn" disabled={i >= flights.length - 1} onClick={() => goFlight(flights[i + 1].id)}>▶</button>
         <span className="spacer" /><span className="pill" style={{ background: levelColor(c, f.levelId) + '33' }}>{done}/{runners.length} entered</span>
       </div>
-      <p className="muted small" style={{ marginTop: -4 }}>Type the time (e.g. <b>42.31</b> or <b>1:05.40</b>) and press <b>Enter</b>: it saves and jumps to the next athlete. Parents and the TV see it within seconds.</p>
+      <p className="muted small" style={{ marginTop: -4 }}>Type <b>points</b>, press Enter, type the <b>time</b> (42.31 or 1:05.40), press Enter: it saves and jumps to the next athlete. Fell? Type their points and tap <b>Fell</b>. Ranking: most points, then fastest time.</p>
+      {c.event.settings.hideResultsUntilFinal && <div className="banner">Parents won't see scores for a level until you tick <b>Results final</b> on its leaderboard.</div>}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {runners.map((a, k) => <EntryRow key={a.id} c={c} a={a} inputRef={el => { inputs.current[k] = el; }}
           onSaved={() => { const nx = inputs.current[k + 1]; if (nx) nx.focus(); else if (flights[i + 1]) toast('Flight complete ✔', { label: 'Next flight ▶', run: () => goFlight(flights[i + 1].id) }); }} />)}
@@ -47,28 +48,45 @@ export function Results({ c }: { c: Ctx }) {
 }
 
 function EntryRow({ c, a, inputRef, onSaved }: { c: Ctx; a: Athlete; inputRef: (el: HTMLInputElement | null) => void; onSaved: () => void }) {
-  const [v, setV] = useState(a.resultStatus === 'Finished' ? fmtResult(a.resultMs) : '');
-  const [bad, setBad] = useState(false);
-  useEffect(() => { setV(a.resultStatus === 'Finished' ? fmtResult(a.resultMs) : ''); }, [a.resultStatus, a.resultMs]);
+  const ptsTxt = () => (a.resultPoints !== null && a.resultPoints !== undefined ? String(+a.resultPoints) : '');
+  const timeTxt = () => (a.resultStatus === 'Finished' ? fmtResult(a.resultMs) : '');
+  const [pv, setPv] = useState(ptsTxt);
+  const [tv, setTv] = useState(timeTxt);
+  const [bad, setBad] = useState<'' | 'pts' | 'time'>('');
+  const timeRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => { setPv(ptsTxt()); setTv(timeTxt()); }, [a.resultStatus, a.resultMs, a.resultPoints]); // eslint-disable-line react-hooks/exhaustive-deps
   const st = a.levelId ? standings(c, a.levelId).find(s => s.a.id === a.id) : undefined;
+  /** Save what's typed. Time present -> Finished; points only -> keep current DNF, else Finished without time. */
   const save = (advance: boolean) => {
-    if (v.trim() === '') { setBad(false); return; }
-    const ms = parseResult(v);
-    if (ms === null || ms <= 0) { setBad(true); toast(`"${v}" isn't a time. Use 42.31 or 1:05.40`); return; }
-    setBad(false); setV(fmtResult(ms));
-    void setResult(a.id, 'Finished', ms);
+    const pts = parsePoints(pv), ms = tv.trim() ? parseResult(tv) : null;
+    if (Number.isNaN(pts as number)) { setBad('pts'); toast(`"${pv}" isn't a points number`); return false; }
+    if (tv.trim() && (ms === null || ms <= 0)) { setBad('time'); toast(`"${tv}" isn't a time. Use 42.31 or 1:05.40`); return false; }
+    setBad('');
+    if (pts === null && ms === null) return true;
+    if (ms !== null) setTv(fmtResult(ms));
+    const status: ResultStatus = ms === null && a.resultStatus === 'DNF' ? 'DNF' : 'Finished';
+    void setResult(a.id, status, ms, pts);
     if (advance) onSaved();
+    return true;
   };
-  const mark = (s: ResultStatus) => { void setResult(a.id, s, null); setV(''); onSaved(); };
+  const mark = (s: ResultStatus) => {
+    const pts = parsePoints(pv);
+    void setResult(a.id, s, null, s === 'DNF' && !Number.isNaN(pts as number) ? pts : null);
+    setTv(''); if (s !== 'DNF') setPv(''); onSaved();
+  };
   return <div className={'entry' + (a.resultStatus ? ' has' : '')}>
     <div className="who"><b>{a.name}</b>{a.age !== null && <span className="muted small"> · {a.age}</span>}
-      <div className="small muted">{st?.rank ? `${ordinal(st.rank)} in ${c.levelById.get(a.levelId!)?.name}` : a.resultStatus && a.resultStatus !== 'Finished' ? a.resultStatus : 'not entered'}</div></div>
-    <input ref={inputRef} className={'timein' + (bad ? ' bad' : '')} inputMode="decimal" enterKeyHint="next" placeholder="time" value={v}
-      onChange={e => setV(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(true); } }} onBlur={() => save(false)}
+      <div className="small muted">{st?.rank ? `${ordinal(st.rank)} in ${c.levelById.get(a.levelId!)?.name}` : a.resultStatus ? resultText(a) : 'not entered'}</div></div>
+    <input ref={inputRef} className={'ptsin' + (bad === 'pts' ? ' bad' : '')} inputMode="decimal" enterKeyHint="next" placeholder="pts" value={pv}
+      onChange={e => setPv(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); timeRef.current?.focus(); } }}
+      aria-label={`Points for ${a.name}`} />
+    <input ref={timeRef} className={'timein' + (bad === 'time' ? ' bad' : '')} inputMode="decimal" enterKeyHint="next" placeholder="time" value={tv}
+      onChange={e => setTv(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(true); } }} onBlur={() => save(false)}
       aria-label={`Time for ${a.name}`} />
     <div className="seg mini">{(['DNF', 'DNS', 'DQ'] as ResultStatus[]).map(s =>
-      <button key={s} className={a.resultStatus === s ? 'on' : ''} onClick={() => mark(s)} title={s === 'DNF' ? 'Did not finish (fell)' : s === 'DNS' ? 'Did not start' : 'Disqualified'}>{s}</button>)}</div>
-    <button className="btn sm ghost" disabled={!a.resultStatus} onClick={() => { void setResult(a.id, null, null); setV(''); }} aria-label="Clear result">✕</button>
+      <button key={s} className={a.resultStatus === s ? 'on' : ''} onClick={() => mark(s)}
+        title={s === 'DNF' ? 'Fell / did not finish: keeps the points typed, no time' : s === 'DNS' ? 'Did not start' : 'Disqualified'}>{s === 'DNF' ? 'Fell' : s}</button>)}</div>
+    <button className="btn sm ghost" disabled={!a.resultStatus} onClick={() => { void setResult(a.id, null, null); setTv(''); setPv(''); }} aria-label="Clear result">✕</button>
   </div>;
 }
 
@@ -82,6 +100,7 @@ export function Leaderboard({ c, levelId, onLevel, readOnly }: { c: Ctx; levelId
       {onLevel ? <select value={levelId} onChange={e => onLevel(e.target.value)} style={{ width: 'auto' }}>
         {c.levels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select> : <LevelPill name={lvl.name} color={lvl.color} />}
     </div>
+    <div className="small muted" style={{ marginBottom: 8 }}>Ranked by most points, then fastest time.</div>
     {!readOnly && <div className="row small" style={{ marginBottom: 10, gap: 14 }}>
       <label className="row" style={{ gap: 6 }}>Top
         <input type="number" min={0} inputMode="numeric" defaultValue={lvl.advanceCount} key={lvl.id + lvl.advanceCount} style={{ width: 72, minHeight: 36, padding: '4px 8px' }}
@@ -89,10 +108,11 @@ export function Leaderboard({ c, levelId, onLevel, readOnly }: { c: Ctx; levelId
       <label className="row" style={{ gap: 6 }}><input type="checkbox" checked={lvl.resultsFinal} onChange={e => void updateLevel(lvl.id, { resultsFinal: e.target.checked })} />
         <b>Results final</b> <span className="muted">(tells parents Advancing / Done)</span></label>
     </div>}
-    <table className="t lb"><thead><tr><th>#</th><th>Athlete</th><th>Time</th><th>Status</th>{!readOnly && <th>Override</th>}</tr></thead>
+    <table className="t lb"><thead><tr><th>#</th><th>Athlete</th><th>Pts</th><th>Time</th><th>Status</th>{!readOnly && <th>Override</th>}</tr></thead>
       <tbody>{st.map((s: Standing) => { const vd = verdict(c, s.a, st); return <tr key={s.a.id} className={vd.kind === 'advance' ? 'adv' : ''}>
         <td className="muted">{s.rank ?? ''}</td><td><b>{s.a.name}</b></td>
-        <td className="time">{resultText(s.a) || <span className="muted">—</span>}</td>
+        <td className="time">{fmtPoints(s.a.resultPoints).replace(' pts', '') || <span className="muted">—</span>}</td>
+        <td className="time">{s.a.resultStatus === 'Finished' ? fmtResult(s.a.resultMs) : s.a.resultStatus === 'DNF' ? 'fell' : s.a.resultStatus ?? <span className="muted">—</span>}</td>
         <td><span className={'pill v-' + vd.kind}>{vd.short || (s.a.resultStatus ? '' : 'waiting')}</span></td>
         {!readOnly && <td><select value={s.a.outcome ?? ''} style={{ minHeight: 34, padding: '4px 6px', fontSize: 14 }}
           onChange={e => void setOutcome(s.a.id, (e.target.value || null) as Outcome | null)}>

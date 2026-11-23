@@ -50,7 +50,7 @@ export async function reload() {
 export function normalize(data: Data) {
   data.events.forEach(e => { e.settings = { ...DEFAULT_SETTINGS, ...(e.settings ?? {}) }; });
   data.levels.forEach(l => { l.advanceCount ??= 0; l.resultsFinal ??= false; });
-  data.athletes.forEach(a => { a.resultMs ??= null; a.resultStatus ??= null; a.resultAt ??= null; a.outcome ??= null; });
+  data.athletes.forEach(a => { a.resultMs ??= null; a.resultPoints ??= null; a.resultStatus ??= null; a.resultAt ??= null; a.outcome ??= null; });
   return data;
 }
 function applyRemote(table: TableName, row: Record<string, unknown> | null, id: string) {
@@ -120,7 +120,7 @@ export const moveAthlete = (id: string, flight: Flight | null) =>
 
 export async function addAthlete(eventId: string, a: Partial<Athlete>) {
   const row: Athlete = { id: uid(), eventId, name: 'New athlete', age: null, levelId: null, flightId: null, overrideMin: null,
-    status: 'Pending', notes: '', changedAt: nowISO(), srcRow: null, resultMs: null, resultStatus: null, resultAt: null, outcome: null, ...a } as Athlete;
+    status: 'Pending', notes: '', changedAt: nowISO(), srcRow: null, resultMs: null, resultPoints: null, resultStatus: null, resultAt: null, outcome: null, ...a } as Athlete;
   await commit([{ table: 'athletes', upsert: [row as unknown as Row] },
     { table: 'changes', upsert: [logChange(eventId, row.name, 'Added', '', flLabel(row.flightId), [{ table: 'athletes', id: row.id, op: 'delete' }]) as unknown as Row] }]);
   return row;
@@ -200,7 +200,7 @@ export async function createEvent(name: string, date: string | null, imp?: Impor
     const levelId = a.level ? lid.get(a.level) ?? null : null;
     return { id: uid(), eventId: ev.id, name: a.name, age: a.age, levelId, flightId: levelId && a.flight !== null ? fk.get(`${levelId}|${a.flight}`) ?? null : null,
       overrideMin: a.overrideMin, status: a.status, notes: a.notes, changedAt: null, srcRow: a.srcRow,
-      resultMs: null, resultStatus: null, resultAt: null, outcome: null };
+      resultMs: null, resultPoints: null, resultStatus: null, resultAt: null, outcome: null };
   });
   await commit([
     { table: 'events', upsert: [ev as unknown as Row] },
@@ -234,15 +234,27 @@ export async function undoChange(id: string) {
 }
 
 // ---------------- results ----------------
-const resultLabel = (st: ResultStatus | null, ms: number | null) => (!st ? '—' : st === 'Finished' ? fmtResult(ms) : st);
-/** Record (or clear) an athlete's run. Pass status null to clear. */
-export async function setResult(id: string, status: ResultStatus | null, ms: number | null) {
+const resultLabel = (st: ResultStatus | null, ms: number | null, pts: number | null) => {
+  if (!st) return '—';
+  if (st === 'DNS' || st === 'DQ') return st;
+  return [pts !== null ? `${pts} pts` : '', st === 'DNF' ? 'fell' : fmtResult(ms)].filter(Boolean).join(' · ');
+};
+/**
+ * Record (or clear) an athlete's run. status null clears it.
+ * Finished = completed with a time; DNF = fell (keeps points, no time); DNS/DQ = no score.
+ */
+export async function setResult(id: string, status: ResultStatus | null, ms: number | null, points: number | null = null) {
   const a = find<Athlete>('athletes', id); if (!a) return;
-  const patch = { resultStatus: status, resultMs: status === 'Finished' ? ms : null, resultAt: status ? nowISO() : null };
-  if (patch.resultStatus === a.resultStatus && patch.resultMs === a.resultMs) return;
-  const before = { resultStatus: a.resultStatus, resultMs: a.resultMs, resultAt: a.resultAt };
+  const patch = {
+    resultStatus: status,
+    resultMs: status === 'Finished' ? ms : null,
+    resultPoints: status === 'Finished' || status === 'DNF' ? points : null,
+    resultAt: status ? nowISO() : null,
+  };
+  if (patch.resultStatus === a.resultStatus && patch.resultMs === a.resultMs && patch.resultPoints === a.resultPoints) return;
+  const before = { resultStatus: a.resultStatus, resultMs: a.resultMs, resultPoints: a.resultPoints, resultAt: a.resultAt };
   await commit([{ table: 'athletes', upsert: [{ id, ...patch }] },
-    { table: 'changes', upsert: [logChange(a.eventId, a.name, 'Result', resultLabel(a.resultStatus, a.resultMs), resultLabel(patch.resultStatus, patch.resultMs),
+    { table: 'changes', upsert: [logChange(a.eventId, a.name, 'Result', resultLabel(a.resultStatus, a.resultMs, a.resultPoints), resultLabel(patch.resultStatus, patch.resultMs, patch.resultPoints),
       [{ table: 'athletes', id, op: 'update', patch: before }]) as unknown as Row] }]);
 }
 export async function setOutcome(id: string, outcome: Outcome | null) {
