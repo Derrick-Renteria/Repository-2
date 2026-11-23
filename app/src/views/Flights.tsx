@@ -11,7 +11,7 @@ export function Flights({ c }: { c: Ctx }) {
   const [from, setFrom] = useState<number | null>(null);
   const [delta, setDelta] = useState(15);
   const all = sortedFlights(c);
-  const groups = view === 'time' ? [{ id: 'all', name: 'All flights in time order', color: '#0F172A', list: all }]
+  const groups = view === 'time' ? [{ id: 'all', name: 'All flights in time order', color: 'var(--ink)', list: all }]
     : c.levels.map(l => ({ id: l.id, name: l.name, color: l.color, list: all.filter(f => f.levelId === l.id).sort((a, b) => a.number - b.number) }));
 
   const add = async (levelId: string) => {
@@ -56,8 +56,8 @@ export function Flights({ c }: { c: Ctx }) {
           const lc = c.levelById.get(f.levelId)?.color ?? '#999';
           return <tr key={f.id}>
             <td style={{ borderLeft: `6px solid ${lc}` }}><a href={'#/flight/' + f.id} style={{ fontWeight: 700, color: 'inherit' }}>{flightLabel(c, f)}</a></td>
-            <td><TimeField value={f.startMin} onChange={v => void updateFlight(f.id, { startMin: v })} /></td>
-            <td><b style={{ color: m.length > c.event.settings.maxPerFlight ? 'var(--red)' : undefined }}>{m.length}</b><span className="muted">/{c.event.settings.maxPerFlight}</span></td>
+            <td className="tcell"><TimeField value={f.startMin} onChange={v => void updateFlight(f.id, { startMin: v })} /></td>
+            <td className="ncell"><b style={{ color: m.length > c.event.settings.maxPerFlight ? 'var(--red)' : undefined }}>{m.length}</b><span className="muted">/{c.event.settings.maxPerFlight}</span></td>
             <td className="muted">{ages.length ? (Math.min(...ages) === Math.max(...ages) ? Math.min(...ages) : `${Math.min(...ages)}–${Math.max(...ages)}`) : ''}</td>
             <td><input type="text" defaultValue={f.notes} placeholder="Notes" onBlur={e => void updateFlight(f.id, { notes: e.target.value })} /></td>
             <td><AlertPills alerts={flightAlerts(c, f)} /></td>

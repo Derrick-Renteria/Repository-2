@@ -37,7 +37,7 @@ export function FlightView({ c, id }: { c: Ctx; id?: string }) {
       <thead><tr><th>#</th><th>Athlete</th><th>Age</th><th>Start</th><th>Status</th><th>Exceptions / notes</th></tr></thead>
       <tbody>{members.map((a, k) => <tr key={a.id} className="click" onClick={() => setEdit(a)} style={a.status === 'Scratched' ? { opacity: .45, textDecoration: 'line-through' } : undefined}>
         <td className="muted">{k + 1}</td><td style={{ fontSize: 19 }}><b>{a.name}</b></td><td>{a.age ?? ''}</td>
-        <td className="time" style={{ color: a.overrideMin !== null ? '#C2410C' : undefined }}>{fmt(athleteTime(c, a))}</td>
+        <td className="time" style={{ color: a.overrideMin !== null ? 'var(--orange)' : undefined }}>{fmt(athleteTime(c, a))}</td>
         <td><StatusPill s={a.status} /></td>
         <td><div className="row" style={{ gap: 4 }}><AlertPills alerts={athleteAlerts(c, a, dupes)} /></div>{a.notes && <div className="small muted">{a.notes}</div>}</td>
       </tr>)}</tbody></table></div>

@@ -42,7 +42,7 @@ export function Board({ c }: { c: Ctx }) {
       <div className="seg">
         <button className={lvl === 'all' ? 'on' : ''} onClick={() => setLvl('all')}>All</button>
         {c.levels.map(l => <button key={l.id} className={lvl === l.id ? 'on' : ''} onClick={() => setLvl(l.id)}>
-          <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: l.color, marginRight: 6 }} />{l.name}</button>)}
+          <span className="lvldot" style={{ background: l.color }} />{l.name}</button>)}
       </div>
       <input type="search" placeholder="Highlight athlete…" value={q} onChange={e => setQ(e.target.value)} />
       <label className="row small"><input type="checkbox" checked={showScr} onChange={e => setShowScr(e.target.checked)} /> Show scratched</label>
@@ -86,7 +86,7 @@ function Card({ id, title, color, count, max, current, children, foot, onOpen }:
   return <div ref={setNodeRef} className={'fcard' + (isOver ? ' over' : '') + (current ? ' current' : '')}>
     <div className="fhead" style={{ background: color + '22', borderTop: `5px solid ${color}` }}>
       {title}
-      {current && <span className="pill" style={{ background: '#DCFCE7', color: '#15803D' }}>NOW</span>}
+      {current && <span className="pill nowpill">NOW</span>}
       <span className={'cnt' + (max && count > max ? ' over' : '')}>{count}{max ? `/${max}` : ''}</span>
       {onOpen && <button className="btn sm ghost" onClick={onOpen} aria-label="Open flight">⤢</button>}
     </div>

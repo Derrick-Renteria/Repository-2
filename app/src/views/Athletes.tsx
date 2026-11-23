@@ -45,7 +45,7 @@ export function Athletes({ c }: { c: Ctx }) {
               <option value="">Unassigned</option>
               {flights.filter(x => !a.levelId || x.levelId === a.levelId || x.id === a.flightId).map(x => <option key={x.id} value={x.id}>{flightLabel(c, x)} · {fmt(x.startMin)}</option>)}
             </select></td>
-          <td className="time" style={{ color: a.overrideMin !== null ? '#C2410C' : undefined, whiteSpace: 'nowrap' }}>{fmt(athleteTime(c, a))}{a.overrideMin !== null && ' ⏱'}</td>
+          <td className="time" style={{ color: a.overrideMin !== null ? 'var(--orange)' : undefined, whiteSpace: 'nowrap' }}>{fmt(athleteTime(c, a))}{a.overrideMin !== null && ' ⏱'}</td>
           <td onClick={e => e.stopPropagation()}>
             <select value={a.status} className={`st-${a.status}`} style={{ width: 130, fontWeight: 700 }} onChange={e => void updateAthlete(a.id, { status: e.target.value as Status })}>
               {STATUSES.map(s => <option key={s}>{s}</option>)}</select></td>

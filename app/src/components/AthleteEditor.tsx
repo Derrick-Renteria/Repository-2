@@ -54,7 +54,7 @@ export function AthleteEditor({ c, athlete, onClose }: { c: Ctx; athlete: Athlet
         <label className="f">Notes<textarea value={notes} onChange={e => setNotes(e.target.value)} onBlur={() => save({ notes })} /></label>
         {history.length > 0 && <div>
           <h3>History</h3>
-          {history.map(h => <div key={h.id} className="row small" style={{ padding: '4px 0', borderBottom: '1px solid #F1F5F9' }}>
+          {history.map(h => <div key={h.id} className="row small" style={{ padding: '4px 0', borderBottom: '1px solid var(--subtle)' }}>
             <span className="muted">{ago(h.at)}</span><b>{h.field}</b><span>{h.oldValue} → {h.newValue}</span>
             <span className="spacer" />{h.undo && !h.undone && <button className="btn sm" onClick={() => void undoChange(h.id)}>Undo</button>}
           </div>)}

@@ -105,15 +105,13 @@ export function nowNext(c: Ctx, at = new Date()): NowNext {
     }
     return { current: manual, next: list.slice(i + 1, i + 3), lateMin: late, mode: 'manual' };
   }
-  if (!c.event.date || c.event.date === todayISO(at)) {
+  if (c.event.date === todayISO(at)) {          // follow the clock only on competition day
     const t = nowMin(at);
     let cur: Flight | null = null;
     for (const f of list) if ((f.startMin ?? 0) <= t) cur = f;
     if (cur && t - (cur.startMin ?? 0) > s.flightLengthMin * 2 && list.indexOf(cur) === list.length - 1) cur = null;
-    if (c.event.date === todayISO(at) || cur) {
-      const i = cur ? list.indexOf(cur) : -1;
-      return { current: cur, next: list.slice(i + 1, i + 3), lateMin: null, mode: 'live' };
-    }
+    const i = cur ? list.indexOf(cur) : -1;
+    return { current: cur, next: list.slice(i + 1, i + 3), lateMin: null, mode: 'live' };
   }
   return { current: null, next: list.slice(0, 2), lateMin: null, mode: 'preview' };
 }

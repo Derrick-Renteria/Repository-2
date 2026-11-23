@@ -30,8 +30,14 @@ export function Toasts() {
     </div>))}</div>;
 }
 
+/** Black or white text, whichever reads better on `hex`. */
+export function inkOn(hex: string) {
+  const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i); if (!m) return '#111';
+  const [r, g, b] = m.slice(1).map(x => parseInt(x, 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#111' : '#fff';
+}
 export const LevelPill = ({ name, color }: { name: string; color: string }) =>
-  name ? <span className="pill lvl" style={{ background: color + '33', borderColor: color }}>{name}</span> : <span className="pill al-error">No level</span>;
+  name ? <span className="pill lvl" style={{ background: color, color: inkOn(color) }}>{name}</span> : <span className="pill al-error">No level</span>;
 export const StatusPill = ({ s }: { s: Status }) => <span className={`pill st-${s}`}>{s}</span>;
 export const AlertPills = ({ alerts }: { alerts: Alert[] }) =>
   <>{alerts.map(a => <span key={a.code} className={`pill al-${a.severity}`}>{a.text}</span>)}</>;

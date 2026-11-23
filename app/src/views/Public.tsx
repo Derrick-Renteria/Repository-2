@@ -59,10 +59,10 @@ function PublicBody({ c, updated }: { c: Ctx; updated: Date | null }) {
         return <div key={f.id} className={'pflight' + (nn.current?.id === f.id ? ' now' : '') + (curIdx >= 0 && idx < curIdx && !ql ? ' done' : '')}>
           <div className="ph" style={{ background: levelColor(c, f.levelId) + '26', borderTop: `5px solid ${levelColor(c, f.levelId)}` }}>
             <span className="tm">{fmt(f.startMin)}</span><b style={{ fontSize: 17 }}>{flightLabel(c, f, true)}</b><span className="spacer" />
-            {nn.current?.id === f.id ? <span className="pill" style={{ background: '#DCFCE7', color: '#15803D' }}>NOW</span> : <span className="muted small">{list.length}</span>}
+            {nn.current?.id === f.id ? <span className="pill nowpill">NOW</span> : <span className="muted small">{list.length}</span>}
           </div>
           <ul>{list.map(a => <li key={a.id}>{mark(a.name)}{c.event.settings.publicShowAge && a.age !== null && <span className="muted small"> · {a.age}</span>}
-            {a.overrideMin !== null && <span className="small" style={{ color: '#C2410C' }}> · {fmt(a.overrideMin)}</span>}</li>)}</ul>
+            {a.overrideMin !== null && <span className="small" style={{ color: 'var(--orange)' }}> · {fmt(a.overrideMin)}</span>}</li>)}</ul>
           {f.notes && <div className="fnote">▶ {f.notes}</div>}
           {i === shown.length - 1 ? null : null}
         </div>;

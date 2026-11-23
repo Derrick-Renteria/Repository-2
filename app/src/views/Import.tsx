@@ -43,7 +43,7 @@ export function Import() {
       <div className="row" style={{ flexWrap: 'nowrap' }}><input type="url" placeholder="https://docs.google.com/spreadsheets/d/…" value={link} onChange={e => setLink(e.target.value)} />
         <button className="btn primary" disabled={!link || busy} onClick={() => void fromLink()}>{busy ? 'Reading…' : 'Read'}</button></div>
       <h2 style={{ marginTop: 6 }}>2 · Or upload a CSV file</h2>
-      <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={async e => { const f = e.target.files?.[0]; if (f) run(await f.text(), f.name.replace(/\.(csv|tsv|txt)$/i, '')); }} />
+      <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={async e => { const f = e.target.files?.[0]; if (f) run(await f.text(), cleanTitle(f.name)); }} />
       <span className="small muted">In Google Sheets: File ▸ Download ▸ CSV. In Excel: Save As ▸ CSV.</span>
       <h2 style={{ marginTop: 6 }}>3 · Or copy &amp; paste the cells</h2>
       <textarea placeholder="Select all cells in your sheet (including the header row), copy, and paste here" value={text} onChange={e => setText(e.target.value)} style={{ minHeight: 110 }} />
@@ -62,7 +62,7 @@ export function Import() {
         <div className={'tile' + (review.length ? ' bad' : '')}><div className="k">To review</div><div className="v">{review.length}</div><div className="s">marked Pending</div></div>
       </div>
       {review.length > 0 && <div><h3>Needs your review (these athletes are marked Pending with a note)</h3>
-        {review.map((i, k) => <div key={k} className="small" style={{ padding: '6px 0', borderBottom: '1px solid #F1F5F9' }}>
+        {review.map((i, k) => <div key={k} className="small" style={{ padding: '6px 0', borderBottom: '1px solid var(--subtle)' }}>
           <span className="pill al-error">{i.type}</span> <b>{i.name}</b> {i.row ? <span className="muted">(row {i.row})</span> : null} — {i.detail}</div>)}</div>}
       {info.length > 0 && <details><summary className="small"><b>{info.length} other notes</b> (cleanup, large flights, breaks)</summary>
         {info.map((i, k) => <div key={k} className="small" style={{ padding: '4px 0' }}>• {i.detail}</div>)}</details>}
@@ -82,4 +82,9 @@ export function Import() {
       <button className="btn" onClick={async () => { const n = prompt('Competition name?'); if (n) { await createEvent(n, todayISO()); go('settings'); } }}>Create empty competition</button>
     </div>
   </div>;
+}
+
+/** "NInja Tourn Nov 1 26 - Flight List - Sheet1.csv" -> "NInja Tourn Nov 1 26" */
+export function cleanTitle(file: string) {
+  return file.replace(/\.(csv|tsv|txt)$/i, '').replace(/\s*-\s*sheet\s*\d+$/i, '').replace(/\s*-\s*flight list$/i, '').trim();
 }

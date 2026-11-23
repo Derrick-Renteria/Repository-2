@@ -35,6 +35,7 @@ export function Dashboard({ c }: { c: Ctx }) {
     <div className="nowbar">
       <div className="now">
         <div className="lab">{nn.mode === 'preview' ? 'FIRST UP' : 'ON THE COURSE NOW'}</div>
+        {!c.event.date && <div className="small" style={{ color: '#94A3B8' }}>Set the competition date in Settings so "Now" follows the clock on the day.</div>}
         {nn.current ? <>
           <div className="tm">{fmt(nn.current.startMin)}</div>
           <div className="fl">{flightLabel(c, nn.current, true)} · {activeIn(c, nn.current).length} athletes</div>
@@ -93,7 +94,7 @@ export function Dashboard({ c }: { c: Ctx }) {
       <div className="card">
         <div className="row"><h2 style={{ margin: 0 }}>Recent changes</h2><span className="spacer" /><a href="#/changes">All</a></div>
         {changes.length === 0 && <div className="empty">No changes yet</div>}
-        {changes.map(ch => <div key={ch.id} className="small" style={{ padding: '7px 0', borderBottom: '1px solid #F1F5F9', opacity: ch.undone ? .5 : 1 }}>
+        {changes.map(ch => <div key={ch.id} className="small" style={{ padding: '7px 0', borderBottom: '1px solid var(--subtle)', opacity: ch.undone ? .5 : 1 }}>
           <div className="row"><b>{ch.target}</b><span className="muted">{ago(ch.at)}</span><span className="spacer" />
             {ch.undo && !ch.undone && <button className="btn sm" onClick={() => void undoChange(ch.id)}>Undo</button>}</div>
           <div>{ch.field}: <span className="muted">{ch.oldValue || '—'}</span> → <b>{ch.newValue || '—'}</b></div>
