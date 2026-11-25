@@ -17,7 +17,7 @@ export function FlightView({ c, id }: { c: Ctx; id?: string }) {
   const dupes = duplicateNames(c);
   const color = levelColor(c, f.levelId);
   return <>
-    <div className="toolbar">
+    <div className="toolbar" data-tour="picker">
       <button className="btn" disabled={i <= 0} onClick={() => go('flight/' + list[i - 1].id)}>◀ Previous</button>
       <select value={f.id} onChange={e => go('flight/' + e.target.value)} style={{ maxWidth: 340 }}>
         {list.map(x => <option key={x.id} value={x.id}>{fmt(x.startMin)} — {flightLabel(c, x, true)} ({activeIn(c, x).length})</option>)}</select>
@@ -33,7 +33,7 @@ export function FlightView({ c, id }: { c: Ctx; id?: string }) {
       {f.notes && <div className="fnote" style={{ padding: '10px 0 0', fontSize: 16 }}>▶ {f.notes}</div>}
       <div className="row" style={{ marginTop: 8 }}><AlertPills alerts={flightAlerts(c, f)} /></div>
     </div>
-    <div className="tablewrap"><table className="t" style={{ fontSize: 18 }}>
+    <div className="tablewrap" data-tour="list"><table className="t" style={{ fontSize: 18 }}>
       <thead><tr><th>#</th><th>Athlete</th><th>Age</th><th>Start</th><th>Status</th><th>Exceptions / notes</th></tr></thead>
       <tbody>{members.map((a, k) => <tr key={a.id} className="click" onClick={() => setEdit(a)} style={a.status === 'Scratched' ? { opacity: .45, textDecoration: 'line-through' } : undefined}>
         <td className="muted">{k + 1}</td><td style={{ fontSize: 19 }}><b>{a.name}</b></td><td>{a.age ?? ''}</td>

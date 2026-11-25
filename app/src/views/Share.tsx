@@ -19,7 +19,7 @@ export function Share({ c }: { c: Ctx }) {
       <div className="form">
         <h2>Public link: coaches &amp; parents</h2>
         <p className="muted">Anyone can open it on a phone, no login. It updates live, has a "find my athlete" search, shows times and results as they're entered, and never shows notes or scratched athletes.</p>
-        <input type="text" readOnly value={url} onFocus={e => e.target.select()} />
+        <input data-tour="link" type="text" readOnly value={url} onFocus={e => e.target.select()} />
         <div className="row">
           <button className="btn primary" onClick={() => { void navigator.clipboard?.writeText(url); toast('Link copied'); }}>Copy link</button>
           <a className="btn" href={url} target="_blank" rel="noreferrer">Open</a>
@@ -27,9 +27,9 @@ export function Share({ c }: { c: Ctx }) {
           <a className="btn" href={'#/poster/' + c.event.id} target="_blank" rel="noreferrer">🖨 QR poster</a>
         </div>
       </div>
-      {qr && <img src={qr} alt="QR code for the public schedule" style={{ width: '100%', borderRadius: 12, border: '1px solid var(--line)' }} />}
+      {qr && <img data-tour="qr" src={qr} alt="QR code for the public schedule" style={{ width: '100%', borderRadius: 12, border: '1px solid var(--line)' }} />}
     </div>
-    <div className="card form">
+    <div className="card form" data-tour="print">
       <h2>Print &amp; screens</h2>
       <div className="row">
         <a className="btn" href={'#/print/' + c.event.id + '?mode=flight'} target="_blank" rel="noreferrer">🖨 Schedule by flight</a>

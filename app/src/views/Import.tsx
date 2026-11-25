@@ -40,13 +40,13 @@ export function Import() {
     <h1>Import a competition</h1>
     <div className="card form">
       <h2>1 · Paste your Google Sheets link</h2>
-      <div className="row" style={{ flexWrap: 'nowrap' }}><input type="url" placeholder="https://docs.google.com/spreadsheets/d/…" value={link} onChange={e => setLink(e.target.value)} />
+      <div className="row" data-tour="link" style={{ flexWrap: 'nowrap' }}><input type="url" placeholder="https://docs.google.com/spreadsheets/d/…" value={link} onChange={e => setLink(e.target.value)} />
         <button className="btn primary" disabled={!link || busy} onClick={() => void fromLink()}>{busy ? 'Reading…' : 'Read'}</button></div>
       <h2 style={{ marginTop: 6 }}>2 · Or upload a CSV file</h2>
       <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={async e => { const f = e.target.files?.[0]; if (f) run(await f.text(), cleanTitle(f.name)); }} />
       <span className="small muted">In Google Sheets: File ▸ Download ▸ CSV. In Excel: Save As ▸ CSV.</span>
       <h2 style={{ marginTop: 6 }}>3 · Or copy &amp; paste the cells</h2>
-      <textarea placeholder="Select all cells in your sheet (including the header row), copy, and paste here" value={text} onChange={e => setText(e.target.value)} style={{ minHeight: 110 }} />
+      <textarea data-tour="paste" placeholder="Select all cells in your sheet (including the header row), copy, and paste here" value={text} onChange={e => setText(e.target.value)} style={{ minHeight: 110 }} />
       <div><button className="btn" disabled={!text.trim()} onClick={() => run(text)}>Read pasted cells</button></div>
       <p className="small muted">Columns recognized: <b>Student</b> (or Athlete/Name), <b>Class</b> (or Level), a column with "flight 1", "flight 2"…, <b>Age</b>, <b>Time</b>.</p>
       {err && <div className="banner err">{err}</div>}

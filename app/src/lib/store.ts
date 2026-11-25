@@ -5,6 +5,7 @@ import { CloudBackend, LocalBackend, supabase, type Backend, type WriteOp } from
 import type { ImportResult } from './importer';
 import { fmt } from './time';
 import { fmtResult } from './results';
+import { toast } from '../components/ui';
 
 type Row = { id: string } & Record<string, unknown>;
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
@@ -13,10 +14,13 @@ const nowISO = () => new Date().toISOString();
 interface State {
   data: Data; ready: boolean; error: string | null; saving: number;
   activeEventId: string | null; actor: string; mode: 'local' | 'cloud'; canEdit: boolean;
+  /** this device's undo history (newest last) */
+  myUndo: string[];
 }
 let state: State = {
   data: EMPTY, ready: false, error: null, saving: 0,
   activeEventId: localStorage.getItem('ninja-active-event'), actor: 'This device', mode: 'local', canEdit: true,
+  myUndo: JSON.parse(sessionStorage.getItem('ninja-my-undo') ?? '[]') as string[],
 };
 const subs = new Set<() => void>();
 const emit = () => subs.forEach(f => f());
@@ -65,8 +69,33 @@ function applyRemote(table: TableName, row: Record<string, unknown> | null, id: 
 }
 export function setActiveEvent(id: string) { localStorage.setItem('ninja-active-event', id); set({ activeEventId: id }); }
 
-/** Apply locally (instant), then save. On failure, reload from the source of truth. */
-async function commit(ops: WriteOp[]) {
+/** One-line description of a logged change, for toasts and the Undo button. */
+export function describeChange(c: Change): string {
+  if (c.field === 'Undo') return `Undid: ${c.target} (${c.oldValue})`;
+  if (c.field === 'Redo') return `Redid: ${c.target} (${c.newValue})`;
+  const from = c.oldValue || '—', to = c.newValue || '—';
+  return c.oldValue || c.newValue ? `${c.target}: ${c.field} ${from} → ${to}` : `${c.target}: ${c.field}`;
+}
+function pushUndo(id: string) {
+  const myUndo = [...state.myUndo, id].slice(-200);
+  sessionStorage.setItem('ninja-my-undo', JSON.stringify(myUndo)); set({ myUndo });
+}
+/** The newest change from this device that can still be undone. */
+export function lastUndoable(): Change | null {
+  for (let i = state.myUndo.length - 1; i >= 0; i--) {
+    const c = find<Change>('changes', state.myUndo[i]);
+    if (c && c.undo && !c.undone && c.eventId === state.activeEventId) return c;
+  }
+  return null;
+}
+
+/**
+ * Apply locally (instant), then save. On failure, reload from the source of truth.
+ * Every undoable change is added to this device's undo history and shown in a toast with an Undo button.
+ */
+async function commit(ops: WriteOp[], opts: { silent?: boolean } = {}) {
+  const undoable = ops.filter(o => o.table === 'changes').flatMap(o => (o.upsert ?? []) as unknown as Change[])
+    .filter(c => c.undo && !c.undone && c.field !== 'Undo');
   const d: Record<string, Row[]> = { ...(state.data as unknown as Record<string, Row[]>) };
   for (const op of ops) {
     let rows = [...(d[op.table] ?? [])];
@@ -78,6 +107,10 @@ async function commit(ops: WriteOp[]) {
     d[op.table] = rows;
   }
   set({ data: d as unknown as Data, saving: state.saving + 1 });
+  for (const c of undoable) {
+    pushUndo(c.id);
+    if (!opts.silent) toast('✓ ' + describeChange(c), { label: '↶ Undo', run: () => void undoChange(c.id) }, 9000);
+  }
   try { await backend.write(ops); set({ saving: state.saving - 1, error: null }); if (state.activeEventId) backend.ping?.(state.activeEventId); }
   catch (e) { set({ saving: state.saving - 1, error: 'Not saved: ' + (e as Error).message }); await reload(); }
 }
@@ -177,18 +210,45 @@ export async function shiftFlights(eventId: string, fromMin: number, delta: numb
 // ---------------- levels / events ----------------
 export async function saveLevel(l: Partial<Level> & { eventId: string }) {
   const lvls = state.data.levels.filter(x => x.eventId === l.eventId);
+  const old = l.id ? find<Level>('levels', l.id) : undefined;
   const row = l.id ? { ...l } : { id: uid(), name: 'New level', color: LEVEL_COLORS[lvls.length % LEVEL_COLORS.length], sort: lvls.length + 1, advanceCount: 0, resultsFinal: false, ...l };
-  await commit([{ table: 'levels', upsert: [row as Row] }]);
+  let ch: Change | null = null;
+  if (!old) ch = logChange(l.eventId, String(row.name), 'Level added', '', '', [{ table: 'levels', id: row.id as string, op: 'delete' }]);
+  else {
+    const keys = (Object.keys(l) as (keyof Level)[]).filter(k => k !== 'id' && k !== 'eventId' && l[k] !== old[k]);
+    if (!keys.length) return;
+    const label = keys.includes('name') ? 'Level name' : keys.includes('color') ? 'Level color' : keys.includes('sort') ? 'Level order' : 'Level';
+    ch = logChange(l.eventId, old.name, label, keys.includes('name') ? old.name : '', keys.includes('name') ? String(l.name) : '',
+      [{ table: 'levels', id: old.id, op: 'update', patch: Object.fromEntries(keys.map(k => [k, old[k]])) }]);
+  }
+  await commit([{ table: 'levels', upsert: [row as Row] }, { table: 'changes', upsert: [ch as unknown as Row] }], { silent: !!old && 'sort' in l });
 }
 export async function deleteLevel(id: string) {
   if (state.data.flights.some(f => f.levelId === id) || state.data.athletes.some(a => a.levelId === id))
     throw new Error('This level still has flights or athletes. Move or delete them first.');
-  await commit([{ table: 'levels', remove: [id] }]);
+  const l = find<Level>('levels', id); if (!l) return;
+  await commit([{ table: 'levels', remove: [id] },
+    { table: 'changes', upsert: [logChange(l.eventId, l.name, 'Level deleted', '', '', [{ table: 'levels', id, op: 'insert', row: { ...l } }]) as unknown as Row] }]);
 }
+const SETTING_LABEL: Record<string, string> = {
+  maxPerFlight: 'Max per flight', changeWindowMin: 'Highlight window', flightLengthMin: 'Flight length', publicShowAge: 'Show ages',
+  published: 'Public schedule visible', currentFlightId: 'Flight on course', currentStartedAt: 'Flight start', hideResultsUntilFinal: 'Hide scores until final',
+};
 export async function updateEvent(id: string, patch: Partial<Omit<EventRow, 'settings'>> & { settings?: Partial<EventSettings> }) {
   const e = find<EventRow>('events', id); if (!e) return;
   const row = { ...patch, id, settings: { ...e.settings, ...(patch.settings ?? {}) } };
-  await commit([{ table: 'events', upsert: [row as unknown as Row] }]);
+  const changed = [
+    ...(['name', 'date'] as const).filter(k => k in patch && patch[k] !== e[k]).map(k => [k === 'name' ? 'Competition name' : 'Date', String(e[k] ?? ''), String(patch[k] ?? '')]),
+    ...Object.keys(patch.settings ?? {}).filter(k => (patch.settings as Record<string, unknown>)[k] !== (e.settings as unknown as Record<string, unknown>)[k])
+      .filter(k => k !== 'currentStartedAt').map(k => {
+        const fmtV = (v: unknown) => (k === 'currentFlightId' ? flLabel(v as string | null).replace('Unassigned', 'clock') : String(v));
+        return [SETTING_LABEL[k] ?? k, fmtV((e.settings as unknown as Record<string, unknown>)[k]), fmtV((patch.settings as Record<string, unknown>)[k])];
+      }),
+  ];
+  if (!changed.length) return;
+  const undo: UndoOp[] = [{ table: 'events', id, op: 'update', patch: { name: e.name, date: e.date, settings: { ...e.settings } } }];
+  const ch = changed.map(([f, o, n], i) => logChange(id, e.name, f, o, n, i === 0 ? undo : null));
+  await commit([{ table: 'events', upsert: [row as unknown as Row] }, { table: 'changes', upsert: ch as unknown as Row[] }]);
 }
 export async function createEvent(name: string, date: string | null, imp?: ImportResult) {
   const ev: EventRow = { id: uid(), name, date, settings: { ...DEFAULT_SETTINGS }, createdAt: nowISO() };
@@ -221,16 +281,41 @@ export async function deleteEvent(id: string) {
 }
 
 // ---------------- undo ----------------
-export async function undoChange(id: string) {
-  const c = find<Change>('changes', id); if (!c?.undo || c.undone) return;
+/**
+ * Undo a logged change. The undo itself is logged with the reverse operations, so it can be redone.
+ * Returns the id of the new "Undo"/"Redo" log entry.
+ */
+export async function undoChange(id: string, opts: { quiet?: boolean } = {}): Promise<string | null> {
+  const c = find<Change>('changes', id); if (!c?.undo || c.undone) return null;
+  // capture the current values so this undo can be reversed (redo)
+  const inverse: UndoOp[] = [];
+  for (const u of c.undo) {
+    const cur = find<Row>(u.table, u.id);
+    if (u.op === 'update' && cur) inverse.push({ table: u.table, id: u.id, op: 'update', patch: Object.fromEntries(Object.keys(u.patch ?? {}).map(k => [k, cur[k]])) });
+    else if (u.op === 'insert') inverse.push({ table: u.table, id: u.id, op: 'delete' });
+    else if (u.op === 'delete' && cur) inverse.push({ table: u.table, id: u.id, op: 'insert', row: { ...cur } });
+  }
   // re-create deleted rows first, then restore fields, then remove rows that were added
   const rank = { insert: 0, update: 1, delete: 2 } as const;
   const ops: WriteOp[] = [...c.undo].sort((x, y) => rank[x.op] - rank[y.op]).map(u =>
     u.op === 'update' ? { table: u.table, upsert: [{ id: u.id, ...u.patch }] }
       : u.op === 'insert' ? { table: u.table, upsert: [u.row as Row] }
         : { table: u.table, remove: [u.id] });
-  ops.push({ table: 'changes', upsert: [{ id, undone: true }, logChange(c.eventId, c.target, 'Undo', `${c.field}: ${c.newValue}`, c.oldValue, null) as unknown as Row] });
-  await commit(ops);
+  const isRedo = c.field === 'Undo';
+  const entry = isRedo
+    ? logChange(c.eventId, c.target, 'Redo', c.newValue, c.oldValue, inverse)
+    : logChange(c.eventId, c.target, 'Undo', `${c.field}: ${c.newValue || '—'}`, c.oldValue, inverse);
+  ops.push({ table: 'changes', upsert: [{ id, undone: true }, entry as unknown as Row] });
+  await commit(ops, { silent: true });
+  if (!opts.quiet) toast(isRedo ? `↷ Redone: ${c.target}` : `↶ Undone: ${c.target} (${c.field})`,
+    { label: isRedo ? '↶ Undo' : '↷ Redo', run: () => void undoChange(entry.id) }, 9000);
+  return entry.id;
+}
+/** Top-bar Undo: take back this device's most recent change. */
+export async function undoLast() {
+  const c = lastUndoable();
+  if (!c) { toast('Nothing to undo'); return; }
+  await undoChange(c.id);
 }
 
 // ---------------- results ----------------

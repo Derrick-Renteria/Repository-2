@@ -9,9 +9,9 @@ export function Changes({ c }: { c: Ctx }) {
   const list = getState().data.changes.filter(x => x.eventId === c.event.id && (!q || (x.target + x.field + x.newValue + x.oldValue).toLowerCase().includes(q.toLowerCase())))
     .sort((a, b) => b.at.localeCompare(a.at));
   return <>
-    <div className="toolbar"><input type="search" placeholder="Filter changes…" value={q} onChange={e => setQ(e.target.value)} />
+    <div className="toolbar"><input data-tour="search" type="search" placeholder="Filter changes…" value={q} onChange={e => setQ(e.target.value)} />
       <span className="muted small">{list.length} changes · newest first</span></div>
-    <div className="tablewrap"><table className="t">
+    <div className="tablewrap" data-tour="changes"><table className="t">
       <thead><tr><th>When</th><th>Who</th><th>Athlete / flight</th><th>Change</th><th>Before</th><th>After</th><th></th></tr></thead>
       <tbody>{list.map(x => <tr key={x.id} style={x.undone ? { opacity: .45 } : undefined}>
         <td className="small" style={{ whiteSpace: 'nowrap' }}>{new Date(x.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}<div className="muted">{ago(x.at)}</div></td>

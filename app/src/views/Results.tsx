@@ -25,7 +25,7 @@ export function Results({ c }: { c: Ctx }) {
 
   return <div className="resgrid">
     <div>
-      <div className="toolbar">
+      <div className="toolbar" data-tour="picker">
         <button className="btn" disabled={i <= 0} onClick={() => goFlight(flights[i - 1].id)}>◀</button>
         <select value={f.id} onChange={e => goFlight(e.target.value)} style={{ maxWidth: 360 }}>
           {flights.map(x => { const r = activeIn(c, x); const d = r.filter(a => a.resultStatus).length;
@@ -37,7 +37,7 @@ export function Results({ c }: { c: Ctx }) {
       <p className="muted small" style={{ marginTop: -4 }}>Type <b>points</b>, press Enter, type the <b>time</b> (42.31 or 1:05.40), press Enter: it saves and jumps to the next athlete. Fell? Type their points and tap <b>Fell</b>. Ranking: most points, then fastest time.</p>
       {c.event.settings.hideResultsUntilFinal && <div className="banner">Parents won't see scores for a level until you tick <b>Results final</b> on its leaderboard.</div>}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {runners.map((a, k) => <EntryRow key={a.id} c={c} a={a} inputRef={el => { inputs.current[k] = el; }}
+        {runners.map((a, k) => <EntryRow key={a.id} c={c} a={a} first={k === 0} inputRef={el => { inputs.current[k] = el; }}
           onSaved={() => { const nx = inputs.current[k + 1]; if (nx) nx.focus(); else if (flights[i + 1]) toast('Flight complete ✔', { label: 'Next flight ▶', run: () => goFlight(flights[i + 1].id) }); }} />)}
       </div>
     </div>
@@ -47,7 +47,7 @@ export function Results({ c }: { c: Ctx }) {
   </div>;
 }
 
-function EntryRow({ c, a, inputRef, onSaved }: { c: Ctx; a: Athlete; inputRef: (el: HTMLInputElement | null) => void; onSaved: () => void }) {
+function EntryRow({ c, a, inputRef, onSaved, first }: { c: Ctx; a: Athlete; inputRef: (el: HTMLInputElement | null) => void; onSaved: () => void; first?: boolean }) {
   const ptsTxt = () => (a.resultPoints !== null && a.resultPoints !== undefined ? String(+a.resultPoints) : '');
   const timeTxt = () => (a.resultStatus === 'Finished' ? fmtResult(a.resultMs) : '');
   const [pv, setPv] = useState(ptsTxt);
@@ -77,16 +77,16 @@ function EntryRow({ c, a, inputRef, onSaved }: { c: Ctx; a: Athlete; inputRef: (
   return <div className={'entry' + (a.resultStatus ? ' has' : '')}>
     <div className="who"><b>{a.name}</b>{a.age !== null && <span className="muted small"> · {a.age}</span>}
       <div className="small muted">{st?.rank ? `${ordinal(st.rank)} in ${c.levelById.get(a.levelId!)?.name}` : a.resultStatus ? resultText(a) : 'not entered'}</div></div>
-    <input ref={inputRef} className={'ptsin' + (bad === 'pts' ? ' bad' : '')} inputMode="decimal" enterKeyHint="next" placeholder="pts" value={pv}
+    <input data-tour={first ? 'pts' : undefined} ref={inputRef} className={'ptsin' + (bad === 'pts' ? ' bad' : '')} inputMode="decimal" enterKeyHint="next" placeholder="pts" value={pv}
       onChange={e => setPv(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); timeRef.current?.focus(); } }}
       aria-label={`Points for ${a.name}`} />
-    <input ref={timeRef} className={'timein' + (bad === 'time' ? ' bad' : '')} inputMode="decimal" enterKeyHint="next" placeholder="time" value={tv}
+    <input data-tour={first ? 'time' : undefined} ref={timeRef} className={'timein' + (bad === 'time' ? ' bad' : '')} inputMode="decimal" enterKeyHint="next" placeholder="time" value={tv}
       onChange={e => setTv(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(true); } }} onBlur={() => save(false)}
       aria-label={`Time for ${a.name}`} />
-    <div className="seg mini">{(['DNF', 'DNS', 'DQ'] as ResultStatus[]).map(s =>
+    <div className="seg mini" data-tour={first ? 'fell' : undefined}>{(['DNF', 'DNS', 'DQ'] as ResultStatus[]).map(s =>
       <button key={s} className={a.resultStatus === s ? 'on' : ''} onClick={() => mark(s)}
         title={s === 'DNF' ? 'Fell / did not finish: keeps the points typed, no time' : s === 'DNS' ? 'Did not start' : 'Disqualified'}>{s === 'DNF' ? 'Fell' : s}</button>)}</div>
-    <button className="btn sm ghost" disabled={!a.resultStatus} onClick={() => { void setResult(a.id, null, null); setTv(''); setPv(''); }} aria-label="Clear result">✕</button>
+    <button data-tour={first ? 'clear' : undefined} className="btn sm ghost" disabled={!a.resultStatus} onClick={() => { void setResult(a.id, null, null); setTv(''); setPv(''); }} aria-label="Clear result">✕</button>
   </div>;
 }
 
@@ -94,7 +94,7 @@ export function Leaderboard({ c, levelId, onLevel, readOnly }: { c: Ctx; levelId
   const lvl = c.levelById.get(levelId);
   if (!lvl) return null;
   const st = standings(c, levelId);
-  return <div className="card">
+  return <div className="card" data-tour={readOnly ? undefined : 'board'}>
     <div className="row" style={{ marginBottom: 8 }}>
       <h2 style={{ margin: 0 }}>Leaderboard</h2><span className="spacer" />
       {onLevel ? <select value={levelId} onChange={e => onLevel(e.target.value)} style={{ width: 'auto' }}>
@@ -102,19 +102,19 @@ export function Leaderboard({ c, levelId, onLevel, readOnly }: { c: Ctx; levelId
     </div>
     <div className="small muted" style={{ marginBottom: 8 }}>Ranked by most points, then fastest time.</div>
     {!readOnly && <div className="row small" style={{ marginBottom: 10, gap: 14 }}>
-      <label className="row" style={{ gap: 6 }}>Top
+      <label className="row" data-tour="topn" style={{ gap: 6 }}>Top
         <input type="number" min={0} inputMode="numeric" defaultValue={lvl.advanceCount} key={lvl.id + lvl.advanceCount} style={{ width: 72, minHeight: 36, padding: '4px 8px' }}
           onBlur={e => void updateLevel(lvl.id, { advanceCount: Math.max(0, +e.target.value || 0) })} /> advance</label>
-      <label className="row" style={{ gap: 6 }}><input type="checkbox" checked={lvl.resultsFinal} onChange={e => void updateLevel(lvl.id, { resultsFinal: e.target.checked })} />
+      <label className="row" data-tour="final" style={{ gap: 6 }}><input type="checkbox" checked={lvl.resultsFinal} onChange={e => void updateLevel(lvl.id, { resultsFinal: e.target.checked })} />
         <b>Results final</b> <span className="muted">(tells parents Advancing / Done)</span></label>
     </div>}
     <table className="t lb"><thead><tr><th>#</th><th>Athlete</th><th>Pts</th><th>Time</th><th>Status</th>{!readOnly && <th>Override</th>}</tr></thead>
-      <tbody>{st.map((s: Standing) => { const vd = verdict(c, s.a, st); return <tr key={s.a.id} className={vd.kind === 'advance' ? 'adv' : ''}>
+      <tbody>{st.map((s: Standing, si: number) => { const vd = verdict(c, s.a, st); return <tr key={s.a.id} className={vd.kind === 'advance' ? 'adv' : ''}>
         <td className="muted">{s.rank ?? ''}</td><td><b>{s.a.name}</b></td>
         <td className="time">{fmtPoints(s.a.resultPoints).replace(' pts', '') || <span className="muted">—</span>}</td>
         <td className="time">{s.a.resultStatus === 'Finished' ? fmtResult(s.a.resultMs) : s.a.resultStatus === 'DNF' ? 'fell' : s.a.resultStatus ?? <span className="muted">—</span>}</td>
         <td><span className={'pill v-' + vd.kind}>{vd.short || (s.a.resultStatus ? '' : 'waiting')}</span></td>
-        {!readOnly && <td><select value={s.a.outcome ?? ''} style={{ minHeight: 34, padding: '4px 6px', fontSize: 14 }}
+        {!readOnly && <td data-tour={si === 0 ? 'override' : undefined}><select value={s.a.outcome ?? ''} style={{ minHeight: 34, padding: '4px 6px', fontSize: 14 }}
           onChange={e => void setOutcome(s.a.id, (e.target.value || null) as Outcome | null)}>
           <option value="">Auto</option><option value="advance">Advancing</option><option value="done">Done</option></select></td>}
       </tr>; })}</tbody></table>

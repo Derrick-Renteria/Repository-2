@@ -33,7 +33,7 @@ export function Dashboard({ c }: { c: Ctx }) {
 
   return <>
     <div className="nowbar">
-      <div className="now">
+      <div className="now" data-tour="now">
         <div className="lab">{nn.mode === 'preview' ? 'FIRST UP' : 'ON THE COURSE NOW'}</div>
         {!c.event.date && <div className="small" style={{ color: '#94A3B8' }}>Set the competition date in Settings so "Now" follows the clock on the day.</div>}
         {nn.current ? <>
@@ -44,7 +44,7 @@ export function Dashboard({ c }: { c: Ctx }) {
           <div className="tm">{fmt(nn.next[0].startMin)}</div><div className="fl">{flightLabel(c, nn.next[0], true)}</div>
         </> : <div className="fl">No flights scheduled yet</div>}
         <div className="row" style={{ marginTop: 12 }}>
-          {nn.next[0] && <button className="btn primary" onClick={() => startFlight(nn.next[0].id)}>
+          {nn.next[0] && <button data-tour="start" className="btn primary" onClick={() => startFlight(nn.next[0].id)}>
             ▶ Start {flightLabel(c, nn.next[0])}</button>}
           {nn.current && <button className="btn" onClick={() => go('flight/' + nn.current!.id)}>Open flight</button>}
           {c.event.settings.currentFlightId && <button className="btn ghost" style={{ color: '#CBD5E1' }} onClick={() => startFlight(null)}>Use clock</button>}
@@ -59,7 +59,7 @@ export function Dashboard({ c }: { c: Ctx }) {
       </div>
     </div>
 
-    <div className="tiles">
+    <div className="tiles" data-tour="tiles">
       <Tile k="Athletes" v={c.athletes.length} s={`${c.athletes.length - active.length} scratched`} />
       <Tile k="Competing" v={active.length} s="not scratched" />
       <Tile k="Flights" v={used.length} s={`of ${flights.length} set up`} />
@@ -71,7 +71,7 @@ export function Dashboard({ c }: { c: Ctx }) {
     </div>
 
     <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))' }}>
-      <div className="card">
+      <div className="card" data-tour="attention">
         <h2>Needs attention</h2>
         {problems.length + flightProblems.length === 0 && <div className="empty">✅ Everything looks good</div>}
         {flightProblems.map(({ f, al }) => <div key={f.id} className="attn">
@@ -92,7 +92,7 @@ export function Dashboard({ c }: { c: Ctx }) {
             <div className="bar" style={{ marginTop: 5 }}><i style={{ width: `${(n / maxLvl) * 100}%`, background: l.color }} /></div>
           </div>); })}
       </div>
-      <div className="card">
+      <div className="card" data-tour="recent">
         <div className="row"><h2 style={{ margin: 0 }}>Recent changes</h2><span className="spacer" /><a href="#/changes">All</a></div>
         {changes.length === 0 && <div className="empty">No changes yet</div>}
         {changes.map(ch => <div key={ch.id} className="small" style={{ padding: '7px 0', borderBottom: '1px solid var(--subtle)', opacity: ch.undone ? .5 : 1 }}>
@@ -113,9 +113,9 @@ export function RunningLate({ c }: { c: Ctx }) {
   const from = (nn.current ? nn.next[0]?.startMin : nn.next[0]?.startMin) ?? 0;
   const go = async (d: number) => {
     const n = await shiftFlights(c.event.id, from, d);
-    if (n) toast(`${n} flights moved ${d > 0 ? 'later' : 'earlier'} by ${Math.abs(d)} min`, { label: 'Undo', run: () => { const last = getState().data.changes.filter(x => x.field === 'Shifted').sort((a, b) => b.at.localeCompare(a.at))[0]; if (last) void undoChange(last.id); } });
+    if (!n) toast('No flights left to shift');
   };
-  return <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+  return <div data-tour="late" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
     <div className="small muted" style={{ marginBottom: 6 }}><b>Running late?</b> Shift every flight from {fmt(from)} on:</div>
     <div className="row">{[5, 10, 15].map(d => <button key={d} className="btn sm" onClick={() => void go(d)}>+{d} min</button>)}
       <button className="btn sm" onClick={() => void go(-5)}>−5 min</button></div>

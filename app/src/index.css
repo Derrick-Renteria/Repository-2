@@ -209,3 +209,19 @@ table.lb tr.adv td { background: var(--green-bg); }
 .tvflash .rk { font-size: 2.6vw; font-weight: 700; }
 @keyframes tvin { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
 .tv table { width: 100%; border-collapse: collapse; font-size: 2vw; } .tv td { padding: .5vw .8vw; border-bottom: 1px solid #1E293B; }
+/* ---------- walkthrough ---------- */
+.tour { position: fixed; inset: 0; z-index: 80; }
+.tour-dim { position: fixed; inset: 0; background: rgba(2,6,23,.6); }
+.tour-hole { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(2,6,23,.62); outline: 3px solid var(--accent); transition: all .25s ease; pointer-events: none; }
+.tour-card { position: fixed; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: 0 18px 40px rgba(0,0,0,.35); transition: top .25s, left .25s; }
+.tour-dots { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+.tour-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); cursor: pointer; } .tour-dots i.on { background: var(--accent); }
+.topbtn { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 10px; padding: 7px 12px; font-weight: 700; min-height: 38px; font-size: 14px; white-space: nowrap; }
+.topbtn:disabled { opacity: .4; }
+.topbtn.help.pulse { animation: helppulse 1.6s ease-in-out infinite; }
+@keyframes helppulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,.0); } 50% { box-shadow: 0 0 0 5px rgba(249,115,22,.55); } }
+.undo-what { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; opacity: .7; }
+@media (max-width: 820px) { .undo-what { display: none; } }
+.unzone { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 40; background: var(--card); color: var(--muted);
+  border: 2px dashed var(--line); border-radius: 14px; padding: 14px 22px; font-weight: 700; }
+.unzone.over { border-color: var(--accent); color: var(--accent); }

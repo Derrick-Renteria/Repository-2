@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRoute } from './lib/router';
-import { init, reload, useApp, getState } from './lib/store';
+import { init, reload, useApp, getState, lastUndoable, undoLast, describeChange } from './lib/store';
+import { Tour, tourSeen } from './components/Tour';
 import { supabase, type Session } from './lib/backend';
 import { makeCtx } from './lib/derive';
 import { Toasts } from './components/ui';
@@ -64,10 +65,16 @@ function Admin({ route, email }: { route: string[]; email: string | null }) {
   }, [sb, email]);
 
   const status = app.error ? ['err', 'Error'] : app.saving ? ['saving', 'Saving…'] : app.mode === 'cloud' ? ['', 'Live'] : ['local', 'This device'];
+  const [tour, setTour] = useState(false);
+  useEffect(() => setTour(false), [page]);
+  const last = lastUndoable();
   return <>
     <header className="top">
       <div className="top-row">
         <div className="brand">🥷 <span>Competition</span> {c && <span className="ev">· {c.event.name}</span>}</div>
+        <button className={'topbtn help' + (tourSeen(page) ? '' : ' pulse')} data-tour="howto" onClick={() => setTour(true)}>❓ How to</button>
+        <button className="topbtn" data-tour="undo" disabled={!last} onClick={() => void undoLast()} title={last ? 'Undo: ' + describeChange(last) : 'Nothing to undo yet'}>↶ Undo</button>
+        {last && <span className="undo-what">{describeChange(last)}</span>}
         <div className="sync"><span className={'dot ' + status[0]} />{status[1]}
           {email && <button className="btn sm ghost" style={{ color: '#CBD5E1' }} onClick={() => void supabase()?.auth.signOut()}>Sign out</button>}</div>
       </div>
@@ -91,6 +98,7 @@ function Admin({ route, email }: { route: string[]; email: string | null }) {
                         : page === 'settings' ? <Settings c={c} />
                           : <Dashboard c={c} />}
     </main>
+    {tour && <Tour page={page === 'flight' ? 'flight' : page} onClose={() => setTour(false)} />}
     <Toasts />
   </>;
 }

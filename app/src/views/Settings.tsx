@@ -14,7 +14,7 @@ export function Settings({ c }: { c: Ctx }) {
   const setS = (p: Partial<typeof s>) => void updateEvent(c.event.id, { settings: p });
   return <div className="grid" style={{ maxWidth: 900 }}>
     <h1>Settings</h1>
-    <div className="card form">
+    <div className="card form" data-tour="comp">
       <h2>Competition</h2>
       <div className="two">
         <label className="f">Name<input type="text" defaultValue={c.event.name} onBlur={e => e.target.value.trim() && void updateEvent(c.event.id, { name: e.target.value.trim() })} /></label>
@@ -23,13 +23,13 @@ export function Settings({ c }: { c: Ctx }) {
         <label className="f">Flight length (minutes)<input type="number" defaultValue={s.flightLengthMin} onBlur={e => setS({ flightLengthMin: Math.max(1, +e.target.value || 15) })} /></label>
         <label className="f">Highlight changes for (minutes)<input type="number" defaultValue={s.changeWindowMin} onBlur={e => setS({ changeWindowMin: Math.max(1, +e.target.value || 60) })} /></label>
       </div>
-      <label className="row"><input type="checkbox" checked={s.published} onChange={e => setS({ published: e.target.checked })} /> <b>Public schedule is visible</b> <span className="muted small">(turn off to hide it while you're still arranging)</span></label>
+      <label className="row" data-tour="public"><input type="checkbox" checked={s.published} onChange={e => setS({ published: e.target.checked })} /> <b>Public schedule is visible</b> <span className="muted small">(turn off to hide it while you're still arranging)</span></label>
       <label className="row"><input type="checkbox" checked={s.publicShowAge} onChange={e => setS({ publicShowAge: e.target.checked })} /> Show ages on the public schedule</label>
       <label className="row"><input type="checkbox" checked={s.hideResultsUntilFinal} onChange={e => setS({ hideResultsUntilFinal: e.target.checked })} />
         Hide scores from parents until a level's results are final <span className="muted small">(otherwise scores show live as they're entered)</span></label>
     </div>
 
-    <div className="card form">
+    <div className="card form" data-tour="levels">
       <div className="row"><h2 style={{ margin: 0 }}>Levels</h2><span className="spacer" /><button className="btn sm" onClick={() => void saveLevel({ eventId: c.event.id })}>+ Add level</button></div>
       {c.levels.map((l, i) => <div key={l.id} className="row" style={{ flexWrap: 'nowrap' }}>
         <input type="color" value={l.color} onChange={e => void saveLevel({ ...l, color: e.target.value })} style={{ width: 48, height: 44, border: 0, background: 'none' }} />
@@ -51,7 +51,7 @@ export function Settings({ c }: { c: Ctx }) {
         <button className="btn" onClick={async () => { const n = prompt('Name for the copy?', c.event.name + ' (copy)'); if (n) { await duplicate(c, n); toast('Copied'); } }}>Duplicate this competition</button></div>
     </div>
 
-    <div className="card form">
+    <div className="card form" data-tour="backup">
       <h2>Backup</h2>
       <div className="row">
         <button className="btn" onClick={() => downloadCsv(c)}>⬇ Download schedule (CSV)</button>
@@ -70,17 +70,22 @@ function CloudCard() {
   const [editors, setEditors] = useState<{ email: string }[] | null>(null);
   const [email, setEmail] = useState('');
   useEffect(() => { if (sb && app.mode === 'cloud') void sb.from('editors').select('email').then(r => setEditors(r.data ?? [])); }, [sb, app.mode]);
-  if (app.mode === 'local') return <div className="card"><h2>Sharing &amp; sync</h2>
+  if (app.mode === 'local') return <div className="card" data-tour="editors"><h2>Sharing &amp; sync</h2>
     <p>This copy saves on <b>this device only</b>. To let the coach edit from any device and give everyone a live public link, connect the free cloud database. The steps are in <code>SETUP.md</code>.</p></div>;
-  return <div className="card form"><h2>People who can edit</h2>
+  return <div className="card form" data-tour="editors"><h2>People who can edit</h2>
     <p className="small muted">Anyone can view the public schedule. Only these emails can sign in and make changes. Each person creates their password on the sign-in screen.</p>
     {editors?.map(e => <div key={e.email} className="row"><span>{e.email}</span><span className="spacer" />
-      <button className="btn sm danger" onClick={async () => { if (confirm(`Remove ${e.email}?`)) { await sb!.from('editors').delete().eq('email', e.email); setEditors(editors.filter(x => x.email !== e.email)); } }}>Remove</button></div>)}
+      <button className="btn sm danger" onClick={async () => {
+        if (!confirm(`Remove ${e.email}?`)) return;
+        await sb!.from('editors').delete().eq('email', e.email); setEditors(list => (list ?? []).filter(x => x.email !== e.email));
+        toast(`✓ ${e.email} removed`, { label: '↶ Undo', run: async () => { await sb!.from('editors').insert({ email: e.email }); setEditors(list => [...(list ?? []), { email: e.email }]); toast(`↶ ${e.email} restored`); } }, 9000);
+      }}>Remove</button></div>)}
     <div className="row" style={{ flexWrap: 'nowrap' }}><input type="email" placeholder="coach@example.com" value={email} onChange={e => setEmail(e.target.value)} />
       <button className="btn primary" onClick={async () => {
         const em = email.trim().toLowerCase(); if (!em) return;
         const { error } = await sb!.from('editors').insert({ email: em }); if (error) { toast(error.message); return; }
-        setEditors([...(editors ?? []), { email: em }]); setEmail(''); toast(`${em} can now sign in and edit`);
+        setEditors(list => [...(list ?? []), { email: em }]); setEmail('');
+        toast(`✓ ${em} can now sign in and edit`, { label: '↶ Undo', run: async () => { await sb!.from('editors').delete().eq('email', em); setEditors(list => (list ?? []).filter(x => x.email !== em)); toast(`↶ ${em} removed again`); } }, 9000);
       }}>Add</button></div>
   </div>;
 }
